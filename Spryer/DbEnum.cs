@@ -25,8 +25,8 @@ public readonly struct DbEnum<TEnum> : IEquatable<TEnum>, IEquatable<DbEnum<TEnu
         public override DbEnum<TEnum> Parse(object value) => new(value as string);
         public override void SetValue(IDbDataParameter parameter, DbEnum<TEnum> value)
         {
-            parameter.DbType = DbType.AnsiString;
-            parameter.Size = DbEnum<TEnum>.FixedLength;
+            parameter.DbType = DbType.AnsiStringFixedLength;
+            parameter.Size = DbEnum<TEnum>.MaxLength;
             parameter.Value = value.ToString();
         }
     }
@@ -41,8 +41,8 @@ public readonly struct DbEnum<TEnum> : IEquatable<TEnum>, IEquatable<DbEnum<TEnu
 
         public override void SetValue(IDbDataParameter parameter, DbEnum<TEnum>? value)
         {
-            parameter.DbType = DbType.AnsiString;
-            parameter.Size = DbEnum<TEnum>.FixedLength;
+            parameter.DbType = DbType.AnsiStringFixedLength;
+            parameter.Size = DbEnum<TEnum>.MaxLength;
             parameter.Value = value is not null ? value.ToString() : DBNull.Value;
         }
     }
@@ -55,6 +55,9 @@ public readonly struct DbEnum<TEnum> : IEquatable<TEnum>, IEquatable<DbEnum<TEnu
     }
 
     public DbEnum(string? name)
+        : this(name.AsSpan()) { }
+
+    public DbEnum(ReadOnlySpan<char> name)
     {
         this.value = Enum.TryParse<TEnum>(name, ignoreCase: true, out var value) ? value : default;
     }
@@ -71,7 +74,7 @@ public readonly struct DbEnum<TEnum> : IEquatable<TEnum>, IEquatable<DbEnum<TEnu
 
     public static implicit operator DbEnum<TEnum>(string name) => new(name);
 
-    public static int FixedLength => EnumInfo<TEnum>.MaxLength;
+    public static int MaxLength => EnumInfo<TEnum>.MaxLength;
 
     public override string ToString()
     {
