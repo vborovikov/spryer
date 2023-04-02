@@ -8,14 +8,11 @@ internal static class EnumInfo<T>
     where T : struct, Enum
 {
     private const char ValueSeparator = ',';
-
-    private static readonly bool isFlags;
     private static readonly Dictionary<T, string> names;
-    private static readonly int maxNameLength;
 
     static EnumInfo()
     {
-        isFlags = typeof(T).IsDefined(typeof(FlagsAttribute), false);
+        HasFlags = typeof(T).IsDefined(typeof(FlagsAttribute), false);
         names = new Dictionary<T, string>();
 
         var enumValues = Enum.GetValues<T>();
@@ -39,14 +36,18 @@ internal static class EnumInfo<T>
             }
         }
 
-        maxNameLength = names.Values.Max(x => x.Length);
+        MaxLength = HasFlags ?
+            names.Values.Sum(x => x.Length) + names.Count - 1 :
+            names.Values.Max(x => x.Length);
     }
 
-    public static int MaxLength => maxNameLength * (isFlags ? names.Count : 1) + (isFlags ? names.Count - 1 : 0);
+    public static bool HasFlags { get; }
+
+    public static int MaxLength { get; }
 
     public static string ToString(T value)
     {
-        if (isFlags && !value.Equals(default(T)))
+        if (HasFlags && !value.Equals(default(T)))
         {
             return String.Join(ValueSeparator, names.Keys.Where(k => value.HasFlag(k) && !k.Equals(default(T))).Select(k => names[k]));
         }
