@@ -4,12 +4,19 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
+/// <summary>
+/// Provides the enumeration type information.
+/// </summary>
+/// <typeparam name="T">The enumeration type.</typeparam>
 internal static class EnumInfo<T>
     where T : struct, Enum
 {
     private const char ValueSeparator = ',';
     private static readonly Dictionary<T, string> names;
 
+    /// <summary>
+    /// Initializes static members of the <see cref="EnumInfo{T}"/> class.
+    /// </summary>
     static EnumInfo()
     {
         HasFlags = typeof(T).IsDefined(typeof(FlagsAttribute), false);
@@ -41,10 +48,19 @@ internal static class EnumInfo<T>
             names.Values.Max(x => x.Length);
     }
 
+    /// <summary>
+    /// Gets a value indicating whether the enum type supports flags.
+    /// </summary>
     public static bool HasFlags { get; }
 
+    /// <summary>
+    /// Gets the maximum length of the enum value string representation.
+    /// </summary>
     public static int MaxLength { get; }
 
+    /// <summary>
+    /// Converts a value to a string representation.
+    /// </summary>
     public static string ToString(T value)
     {
         if (HasFlags && !value.Equals(default(T)))
