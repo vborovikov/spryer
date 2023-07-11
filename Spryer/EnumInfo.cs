@@ -61,6 +61,8 @@ internal static class EnumInfo<T>
     /// <summary>
     /// Converts a value to a string representation.
     /// </summary>
+    /// <param name="value">The value.</param>
+    /// <returns>The string representation.</returns>
     public static string ToString(T value)
     {
         if (HasFlags && !value.Equals(default(T)))
@@ -69,5 +71,54 @@ internal static class EnumInfo<T>
         }
 
         return names[value];
+    }
+
+    /// <summary>
+    /// Tries to format the value as a string.
+    /// </summary>
+    /// <param name="value">The value.</param>
+    /// <param name="destination">The destination span.</param>
+    /// <param name="charsWritten">The number of characters written.</param>
+    /// <returns><c>true</c> if successful; otherwise, <c>false</c>.</returns>
+    public static bool TryFormat(T value, Span<char> destination, out int charsWritten)
+    {
+        if (HasFlags && !value.Equals(default(T)))
+        {
+            charsWritten = 0;
+
+            foreach (var nv in names)
+            {
+                if (value.HasFlag(nv.Key) && !nv.Key.Equals(default(T)))
+                {
+                    if (charsWritten > 0)
+                    {
+                        if (charsWritten == destination.Length)
+                            return false;
+
+                        destination[charsWritten++] = ValueSeparator;
+                    }
+                    if (nv.Value.TryCopyTo(destination[charsWritten..]))
+                    {
+                        charsWritten += nv.Value.Length;
+                    }
+                    else
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        var valueName = names[value];
+        if (valueName.TryCopyTo(destination))
+        {
+            charsWritten = valueName.Length;
+            return true;
+        }
+
+        charsWritten = 0;
+        return false;
     }
 }

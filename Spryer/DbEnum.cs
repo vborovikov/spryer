@@ -20,11 +20,26 @@ public readonly struct DbEnum<TEnum> : IEquatable<TEnum>, IEquatable<DbEnum<TEnu
     /// </summary>
     private sealed class JsonConverter : JsonConverter<DbEnum<TEnum>>
     {
-        public override DbEnum<TEnum> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
-            new(reader.GetString());
+        public override DbEnum<TEnum> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.TokenType == JsonTokenType.Null)
+            {
+                return default;
+            }
 
-        public override void Write(Utf8JsonWriter writer, DbEnum<TEnum> value, JsonSerializerOptions options) =>
-            writer.WriteStringValue(value.ToString());
+            Span<char> buffer = stackalloc char[EnumInfo<TEnum>.MaxLength];
+            var charsWritten = reader.CopyString(buffer);
+            ReadOnlySpan<char> source = buffer[..charsWritten];
+            return new(source);
+        }
+
+        public override void Write(Utf8JsonWriter writer, DbEnum<TEnum> value, JsonSerializerOptions options)
+        {
+            Span<char> buffer = stackalloc char[EnumInfo<TEnum>.MaxLength];
+            EnumInfo<TEnum>.TryFormat(value, buffer, out var charsWritten);
+            ReadOnlySpan<char> source = buffer[..charsWritten];
+            writer.WriteStringValue(source);
+        }
     }
 
     /// <summary>
