@@ -105,8 +105,11 @@ public readonly struct DbEnum<TEnum> : IEquatable<TEnum>, IEquatable<DbEnum<TEnu
     /// <summary>
     /// Initializes the Dapper type handlers.
     /// </summary>
-    public static void Initialize()
+    /// <param name="valueSeparator">The enum value separator character.</param>
+    public static void Initialize(char valueSeparator = default)
     {
+        EnumInfo<TEnum>.ValueSeparator = valueSeparator != default ? valueSeparator : EnumInfo<TEnum>.DefaultValueSeparator;
+
         SqlMapper.AddTypeHandler(new DbEnumTypeHandler());
         SqlMapper.AddTypeHandler(new DbNullableEnumTypeHandler());
     }

@@ -11,7 +11,7 @@ using System.Linq;
 internal static class EnumInfo<T>
     where T : struct, Enum
 {
-    private const char ValueSeparator = ',';
+    public const char DefaultValueSeparator = ',';
     private static readonly Dictionary<T, string> names;
 
     /// <summary>
@@ -57,6 +57,11 @@ internal static class EnumInfo<T>
     /// Gets the maximum length of the enum value string representation.
     /// </summary>
     public static int MaxLength { get; }
+
+    /// <summary>
+    /// Gets or sets the enum value separator character.
+    /// </summary>
+    public static char ValueSeparator { get; set; } = DefaultValueSeparator;
 
     /// <summary>
     /// Converts a value to a string representation.
