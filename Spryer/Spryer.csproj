@@ -4,7 +4,7 @@
     <TargetFramework>net7.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Title>Dapper extensions library</Title>
+    <Title>Spryer</Title>
     <Description>Enum mapping and extensions for Dapper</Description>
   </PropertyGroup>
 
