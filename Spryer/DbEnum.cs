@@ -129,10 +129,22 @@ public readonly struct DbEnum<TEnum> : IEquatable<TEnum>, IEquatable<DbEnum<TEnu
     /// </summary>
     public static implicit operator DbEnum<TEnum>(string name) => new(name);
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Returns a string that represents the current <see cref="DbEnum{TEnum}"/> value.
+    /// </summary>
+    /// <returns>The string representation of the current <see cref="DbEnum{TEnum}"/> value.</returns>
     public override string ToString()
     {
         return EnumInfo<TEnum>.ToString(this.value);
+    }
+
+    /// <summary>
+    /// Converts the <see cref="DbEnum{TEnum}"/> value to a <see cref="DbString"/> value.
+    /// </summary>
+    /// <returns>The <see cref="DbString"/> value that represents the current <see cref="DbEnum{TEnum}"/> value.</returns>
+    public DbString ToDbString()
+    {
+        return EnumInfo<TEnum>.ToDbString(this.value);
     }
 
     /// <inheritdoc/>

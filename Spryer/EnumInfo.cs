@@ -3,6 +3,7 @@ namespace Spryer;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Dapper;
 
 /// <summary>
 /// Provides the enumeration type information.
@@ -76,6 +77,16 @@ internal static class EnumInfo<T>
         }
 
         return names[value];
+    }
+
+    /// <summary>
+    /// Converts the <typeparamref name="T"/> value to a <see cref="DbString"/> value.
+    /// </summary>
+    /// <param name="value">The value.</param>
+    /// <returns>The <see cref="DbString"/> value that represents the <typeparamref name="T"/> value.</returns>
+    public static DbString ToDbString(T value)
+    {
+        return ToString(value).AsVarChar(MaxLength);
     }
 
     /// <summary>
