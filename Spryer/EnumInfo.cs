@@ -126,4 +126,32 @@ internal static class EnumInfo<T>
         charsWritten = 0;
         return false;
     }
+
+    /// <summary>
+    /// Converts the string representation of the name of one or more enumerated constants
+    /// to an equivalent enumerated object. A parameter specifies whether the operation is case-sensitive.
+    /// The return value indicates whether the conversion succeeded.
+    /// </summary>
+    /// <param name="value">The span representation of the name of one or more enumerated constants.</param>
+    /// <param name="ignoreCase"><c>true</c> to ignore case; <c>false</c> to consider case.</param>
+    /// <param name="result">When this method returns true, contains an enumeration constant that represents the parsed value.</param>
+    /// <returns><c>true</c> if the conversion succeeded; <c>false</c> otherwise.</returns>
+    public static bool TryParse(ReadOnlySpan<char> value, bool ignoreCase, out T result)
+    {
+        if (value.IsEmpty)
+        {
+            result = default;
+            return false;
+        }
+
+        if (HasFlags && ValueSeparator != DefaultValueSeparator && value.Contains(ValueSeparator))
+        {
+            Span<char> normalizedValue = stackalloc char[value.Length];
+            value.Replace(normalizedValue, ValueSeparator, DefaultValueSeparator);
+
+            return Enum.TryParse(normalizedValue, ignoreCase, out result);
+        }
+
+        return Enum.TryParse(value, ignoreCase, out result);
+    }
 }

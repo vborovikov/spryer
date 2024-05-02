@@ -43,6 +43,38 @@ public readonly struct DbEnum<TEnum> : IEquatable<TEnum>, IEquatable<DbEnum<TEnu
     }
 
     /// <summary>
+    /// A type handler for <typeparamref name="TEnum"/> values to be used with Dapper.
+    /// </summary>
+    private sealed class EnumTypeHandler : SqlMapper.TypeHandler<TEnum>
+    {
+        public override TEnum Parse(object value) =>
+            EnumInfo<TEnum>.TryParse(value as string, ignoreCase: true, out var result) ? result : default;
+
+        public override void SetValue(IDbDataParameter parameter, TEnum value)
+        {
+            parameter.DbType = EnumInfo<TEnum>.HasFlags ? DbType.AnsiString : DbType.AnsiStringFixedLength;
+            parameter.Size = EnumInfo<TEnum>.MaxLength;
+            parameter.Value = EnumInfo<TEnum>.ToString(value);
+        }
+    }
+
+    /// <summary>
+    /// A type handler for nullable <typeparamref name="TEnum"/> values to be used with Dapper.
+    /// </summary>
+    private sealed class NullableEnumTypeHandler : SqlMapper.TypeHandler<TEnum?>
+    {
+        public override TEnum? Parse(object value) =>
+            EnumInfo<TEnum>.TryParse(value as string, ignoreCase: true, out var result) ? result : null;
+
+        public override void SetValue(IDbDataParameter parameter, TEnum? value)
+        {
+            parameter.DbType = EnumInfo<TEnum>.HasFlags ? DbType.AnsiString : DbType.AnsiStringFixedLength;
+            parameter.Size = EnumInfo<TEnum>.MaxLength;
+            parameter.Value = value is not null ? EnumInfo<TEnum>.ToString(value.Value) : DBNull.Value;
+        }
+    }
+
+    /// <summary>
     /// A type handler for <see cref="DbEnum{TEnum}"/> instances to be used with Dapper.
     /// </summary>
     private sealed class DbEnumTypeHandler : SqlMapper.TypeHandler<DbEnum<TEnum>>
@@ -57,7 +89,7 @@ public readonly struct DbEnum<TEnum> : IEquatable<TEnum>, IEquatable<DbEnum<TEnu
     }
 
     /// <summary>
-    /// A nullable type handler for <see cref="DbEnum{TEnum}"/> instances to be used with Dapper.
+    /// A type handler for nullable <see cref="DbEnum{TEnum}"/> instances to be used with Dapper.
     /// </summary>
     private sealed class DbNullableEnumTypeHandler : SqlMapper.TypeHandler<DbEnum<TEnum>?>
     {
@@ -71,7 +103,7 @@ public readonly struct DbEnum<TEnum> : IEquatable<TEnum>, IEquatable<DbEnum<TEnu
         {
             parameter.DbType = EnumInfo<TEnum>.HasFlags ? DbType.AnsiString : DbType.AnsiStringFixedLength;
             parameter.Size = EnumInfo<TEnum>.MaxLength;
-            parameter.Value = value is not null ? value.ToString() : DBNull.Value;
+            parameter.Value = value is not null ? value.Value.ToString() : DBNull.Value;
         }
     }
 
@@ -99,7 +131,7 @@ public readonly struct DbEnum<TEnum> : IEquatable<TEnum>, IEquatable<DbEnum<TEnu
     /// </summary>
     public DbEnum(ReadOnlySpan<char> name)
     {
-        this.value = Enum.TryParse<TEnum>(name, ignoreCase: true, out var value) ? value : default;
+        this.value = EnumInfo<TEnum>.TryParse(name, ignoreCase: true, out var value) ? value : default;
     }
 
     /// <summary>
@@ -110,6 +142,8 @@ public readonly struct DbEnum<TEnum> : IEquatable<TEnum>, IEquatable<DbEnum<TEnu
     {
         EnumInfo<TEnum>.ValueSeparator = valueSeparator != default ? valueSeparator : EnumInfo<TEnum>.DefaultValueSeparator;
 
+        SqlMapper.AddTypeHandler(new EnumTypeHandler());
+        SqlMapper.AddTypeHandler(new NullableEnumTypeHandler());
         SqlMapper.AddTypeHandler(new DbEnumTypeHandler());
         SqlMapper.AddTypeHandler(new DbNullableEnumTypeHandler());
     }

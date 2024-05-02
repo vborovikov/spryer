@@ -1,4 +1,5 @@
 namespace Spryer.Tests;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 [TestClass]
 public class EnumInfoTests
@@ -51,5 +52,17 @@ public class EnumInfoTests
 
         Assert.IsTrue(EnumInfo<TestFlag>.TryFormat(value, destination, out var charsWritten));
         Assert.AreEqual(text, destination[..charsWritten].ToString());
+    }
+
+    [TestMethod]
+    public void TryParse_NonDefaultSeparator_Parsed()
+    {
+        EnumInfo<TestFlag>.ValueSeparator = '|';
+        var value = TestFlag.One | TestFlag.Two;
+        var valueStr = EnumInfo<TestFlag>.ToString(value);
+
+        Assert.AreEqual("One|Two", valueStr);
+        Assert.IsTrue(EnumInfo<TestFlag>.TryParse(valueStr, ignoreCase: true, out var result));
+        Assert.AreEqual(value, result);
     }
 }
