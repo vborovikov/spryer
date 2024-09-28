@@ -1,8 +1,10 @@
 namespace Spryer;
 
 using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using Dapper;
 
 /// <summary>
@@ -13,7 +15,7 @@ internal static class EnumInfo<T>
     where T : struct, Enum
 {
     public const char DefaultValueSeparator = ',';
-    private static readonly Dictionary<T, string> names;
+    private static readonly FrozenDictionary<T, string> names;
 
     /// <summary>
     /// Initializes static members of the <see cref="EnumInfo{T}"/> class.
@@ -21,32 +23,33 @@ internal static class EnumInfo<T>
     static EnumInfo()
     {
         HasFlags = typeof(T).IsDefined(typeof(FlagsAttribute), false);
-        names = new Dictionary<T, string>();
-
-        var enumValues = Enum.GetValues<T>();
-        var enumNames = Enum.GetNames<T>();
-
-        for (var i = 0; i < enumValues.Length; ++i)
-        {
-            var value = enumValues[i];
-            var name = enumNames[i];
-
-            if (names.ContainsKey(value))
-            {
-                if (name.Length < names[value].Length)
-                {
-                    names[value] = name;
-                }
-            }
-            else
-            {
-                names.Add(enumValues[i], enumNames[i]);
-            }
-        }
+        names = GetNames();
 
         MaxLength = HasFlags ?
             names.Values.Sum(x => x.Length) + names.Count - 1 :
             names.Values.Max(x => x.Length);
+
+        static FrozenDictionary<T, string> GetNames()
+        {
+            var names = new Dictionary<T, string>();
+
+            var enumValues = Enum.GetValues<T>();
+            var enumNames = Enum.GetNames<T>();
+
+            for (var i = 0; i < enumValues.Length; ++i)
+            {
+                var value = enumValues[i];
+                var name = enumNames[i];
+
+                ref var storedName = ref CollectionsMarshal.GetValueRefOrAddDefault(names, value, out var nameAlreadyStored);
+                if (!nameAlreadyStored || storedName is null || name.Length < storedName.Length)
+                {
+                    storedName = name;
+                }
+            }
+
+            return names.ToFrozenDictionary();
+        }
     }
 
     /// <summary>

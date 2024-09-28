@@ -54,15 +54,26 @@ public class EnumInfoTests
         Assert.AreEqual(text, destination[..charsWritten].ToString());
     }
 
+    [Flags]
+    private enum TestSeparator
+    {
+        None = 0,
+        Non = None,
+        One = 1 << 0,
+        Two = 1 << 1,
+        Three = 1 << 2,
+        Tri = Three
+    }
+
     [TestMethod]
     public void TryParse_NonDefaultSeparator_Parsed()
     {
-        EnumInfo<TestFlag>.ValueSeparator = '|';
-        var value = TestFlag.One | TestFlag.Two;
-        var valueStr = EnumInfo<TestFlag>.ToString(value);
+        EnumInfo<TestSeparator>.ValueSeparator = '|';
+        var value = TestSeparator.One | TestSeparator.Two;
+        var valueStr = EnumInfo<TestSeparator>.ToString(value);
 
         Assert.AreEqual("One|Two", valueStr);
-        Assert.IsTrue(EnumInfo<TestFlag>.TryParse(valueStr, ignoreCase: true, out var result));
+        Assert.IsTrue(EnumInfo<TestSeparator>.TryParse(valueStr, ignoreCase: true, out var result));
         Assert.AreEqual(value, result);
     }
 }
