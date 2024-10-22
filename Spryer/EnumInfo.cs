@@ -3,7 +3,11 @@ namespace Spryer;
 using System;
 using System.Collections.Frozen;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
+using System.Numerics;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Dapper;
 
@@ -22,7 +26,8 @@ internal static class EnumInfo<T>
     /// </summary>
     static EnumInfo()
     {
-        HasFlags = typeof(T).IsDefined(typeof(FlagsAttribute), false);
+        var enumType = typeof(T);
+        HasFlags = enumType.IsDefined(typeof(FlagsAttribute), false);
         names = GetNames();
 
         MaxLength = HasFlags ?
@@ -31,6 +36,7 @@ internal static class EnumInfo<T>
 
         static FrozenDictionary<T, string> GetNames()
         {
+            var enumType = typeof(T);
             var names = new Dictionary<T, string>();
 
             var enumValues = Enum.GetValues<T>();
@@ -40,6 +46,12 @@ internal static class EnumInfo<T>
             {
                 var value = enumValues[i];
                 var name = enumNames[i];
+                if (enumType.GetField(name, BindingFlags.Public | BindingFlags.Static) is FieldInfo valueField &&
+                    valueField.GetCustomAttribute<AmbientValueAttribute>(inherit: false)?.Value is string ambientName &&
+                    !string.IsNullOrWhiteSpace(ambientName) && ambientName.Length < name.Length)
+                {
+                    name = ambientName;
+                }
 
                 ref var storedName = ref CollectionsMarshal.GetValueRefOrAddDefault(names, value, out var nameAlreadyStored);
                 if (!nameAlreadyStored || storedName is null || name.Length < storedName.Length)
@@ -158,6 +170,23 @@ internal static class EnumInfo<T>
             return false;
         }
 
+        var parsed = false;
+        Unsafe.SkipInit(out result);
+        var underlyingType = typeof(T).GetEnumUnderlyingType();
+        if (underlyingType == typeof(sbyte)) parsed = TryParseByName<sbyte, byte>(value, ignoreCase, out Unsafe.As<T, sbyte>(ref result));
+        else if (underlyingType == typeof(byte)) parsed = TryParseByName<byte, byte>(value, ignoreCase, out Unsafe.As<T, byte>(ref result));
+        else if (underlyingType == typeof(short)) parsed = TryParseByName<short, ushort>(value, ignoreCase, out Unsafe.As<T, short>(ref result));
+        else if (underlyingType == typeof(ushort)) parsed = TryParseByName<ushort, ushort>(value, ignoreCase, out Unsafe.As<T, ushort>(ref result));
+        else if (underlyingType == typeof(int)) parsed = TryParseByName<int, uint>(value, ignoreCase, out Unsafe.As<T, int>(ref result));
+        else if (underlyingType == typeof(uint)) parsed = TryParseByName<uint, uint>(value, ignoreCase, out Unsafe.As<T, uint>(ref result));
+        else if (underlyingType == typeof(long)) parsed = TryParseByName<long, ulong>(value, ignoreCase, out Unsafe.As<T, long>(ref result));
+        else if (underlyingType == typeof(ulong)) parsed = TryParseByName<ulong, ulong>(value, ignoreCase, out Unsafe.As<T, ulong>(ref result));
+
+        if (parsed)
+        {
+            return true;
+        }
+
         if (HasFlags && ValueSeparator != DefaultValueSeparator && value.Contains(ValueSeparator))
         {
             Span<char> normalizedValue = stackalloc char[value.Length];
@@ -167,5 +196,76 @@ internal static class EnumInfo<T>
         }
 
         return Enum.TryParse(value, ignoreCase, out result);
+    }
+
+    private static bool TryParseByName<TUnderlying, TStorage>(ReadOnlySpan<char> value, bool ignoreCase, out TUnderlying result)
+        where TUnderlying : struct, INumber<TUnderlying>, IBitwiseOperators<TUnderlying, TUnderlying, TUnderlying>
+        where TStorage : struct, INumber<TStorage>, IBitwiseOperators<TStorage, TStorage, TStorage>
+    {
+        Unsafe.SkipInit(out result);
+        return TryParseByName(value, ignoreCase, out Unsafe.As<TUnderlying, TStorage>(ref result));
+    }
+
+    private static bool TryParseByName<TStorage>(ReadOnlySpan<char> value, bool ignoreCase, out TStorage result)
+        where TStorage : struct, INumber<TStorage>, IBitwiseOperators<TStorage, TStorage, TStorage>
+    {
+        var enumNames = names.Values;
+        var enumValues = names.Keys;
+
+        var parsed = true;
+        var localResult = default(TStorage);
+        var comparison = ignoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        while (value.Length > 0)
+        {
+            // Find the next separator.
+            ReadOnlySpan<char> subvalue;
+            int endIndex = value.IndexOf(ValueSeparator);
+            if (endIndex < 0)
+            {
+                // No next separator; use the remainder as the next value.
+                subvalue = value.Trim();
+                value = default;
+            }
+            else if (endIndex != value.Length - 1)
+            {
+                // Found a separator before the last char.
+                subvalue = value[..endIndex].Trim();
+                value = value[(endIndex + 1)..];
+            }
+            else
+            {
+                // Last char was a separator, which is invalid.
+                parsed = false;
+                break;
+            }
+
+            // Try to match this substring against each enum name
+            var success = false;
+            for (var i = 0; i < enumNames.Length; i++)
+            {
+                if (subvalue.Equals(enumNames[i], comparison))
+                {
+                    var val = enumValues[i];
+                    localResult |= Unsafe.As<T, TStorage>(ref val);
+                    success = true;
+                    break;
+                }
+            }
+
+            if (!success)
+            {
+                parsed = false;
+                break;
+            }
+        }
+
+        if (parsed)
+        {
+            result = localResult;
+            return true;
+        }
+
+        result = default;
+        return false;
     }
 }

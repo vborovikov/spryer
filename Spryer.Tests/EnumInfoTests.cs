@@ -1,4 +1,6 @@
 namespace Spryer.Tests;
+
+using System.ComponentModel;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 [TestClass]
@@ -75,5 +77,38 @@ public class EnumInfoTests
         Assert.AreEqual("One|Two", valueStr);
         Assert.IsTrue(EnumInfo<TestSeparator>.TryParse(valueStr, ignoreCase: true, out var result));
         Assert.AreEqual(value, result);
+    }
+
+    [Flags]
+    private enum TestAmbient
+    {
+        None = 0,
+        [AmbientValue("N1")]
+        Name1 = 1,
+        Name2 = 2,
+        Name4 = 8,
+        N2 = Name2,
+        [AmbientValue("N3")]
+        Name3 = 4,
+    }
+
+    [TestMethod]
+    public void TryParse_AmbientNames_Parsed()
+    {
+        EnumInfo<TestAmbient>.ValueSeparator = '|';
+        var parsed = EnumInfo<TestAmbient>.TryParse("N1|n3", ignoreCase: true, out var result);
+
+        Assert.IsTrue(parsed);
+        Assert.AreEqual(TestAmbient.Name1 | TestAmbient.Name3, result);
+    }
+
+    [TestMethod]
+    public void TryParse_MixedNames_Parsed()
+    {
+        EnumInfo<TestAmbient>.ValueSeparator = ':';
+        var parsed = EnumInfo<TestAmbient>.TryParse("N1:n2", ignoreCase: true, out var result);
+
+        Assert.IsTrue(parsed);
+        Assert.AreEqual(TestAmbient.Name1 | TestAmbient.Name2, result);
     }
 }
