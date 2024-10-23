@@ -43,4 +43,22 @@ public class DbEnumTests
 
         Assert.AreEqual(',', EnumInfo<TestEnum>.ValueSeparator);
     }
+
+    private enum TestParse
+    {
+        Zero,
+        One,
+        Two,
+        Three,
+    }
+
+    [TestMethod]
+    public void TryParse_Number_FormattedParsed()
+    {
+        var str = TestParse.Two.ToString("d");
+        var parsed = DbEnum<TestParse>.TryParse(str, null, out var value);
+
+        Assert.IsTrue(parsed);
+        Assert.AreEqual(TestParse.Two, (TestParse)value);
+    }
 }
