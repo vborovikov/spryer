@@ -1,6 +1,7 @@
 ﻿namespace Spryer;
 
 using System;
+using System.Collections.Immutable;
 using System.Data;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
@@ -102,6 +103,18 @@ public readonly struct DbEnum<TEnum> : IEquatable<TEnum>, IEquatable<DbEnum<TEnu
     {
         this.value = EnumInfo<TEnum>.TryParse(name, ignoreCase: true, out var value) ? value : default;
     }
+
+    /// <summary>
+    /// Retrieves an array of the names of the constants in <see cref="DbEnum{TEnum}"/> type.
+    /// </summary>
+    /// <returns>A string array of the names of the constants in <see cref="DbEnum{TEnum}"/>.</returns>
+    public static ImmutableArray<string> GetNames() => EnumInfo<TEnum>.GetNames();
+
+    /// <summary>
+    /// Retrieves an array of the values of the constants in <see cref="DbEnum{TEnum}"/> type.
+    /// </summary>
+    /// <returns>An array that contains the values of the constants in <see cref="DbEnum{TEnum}"/>.</returns>
+    public static ImmutableArray<TEnum> GetValues() => EnumInfo<TEnum>.GetValues();
 
     /// <summary>
     /// Initializes the Dapper type handlers.

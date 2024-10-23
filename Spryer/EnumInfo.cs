@@ -3,6 +3,7 @@ namespace Spryer;
 using System;
 using System.Collections.Frozen;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Linq;
 using System.Numerics;
@@ -78,6 +79,10 @@ internal static class EnumInfo<T>
     /// Gets or sets the enum value separator character.
     /// </summary>
     public static char ValueSeparator { get; set; } = DefaultValueSeparator;
+
+    public static ImmutableArray<string> GetNames() => names.Values;
+
+    public static ImmutableArray<T> GetValues() => names.Keys;
 
     /// <summary>
     /// Converts a value to a string representation.
