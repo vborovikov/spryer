@@ -2,6 +2,7 @@
 
 using System;
 using System.Data;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -12,7 +13,7 @@ using Dapper;
 /// </summary>
 /// <typeparam name="TEnum">The enum type.</typeparam>
 [DbEnumJsonConverter]
-public readonly struct DbEnum<TEnum> : IEquatable<TEnum>, IEquatable<DbEnum<TEnum>>
+public readonly struct DbEnum<TEnum> : IEquatable<TEnum>, IEquatable<DbEnum<TEnum>>, ISpanFormattable, ISpanParsable<DbEnum<TEnum>>
     where TEnum : struct, Enum
 {
     /// <summary>
@@ -129,6 +130,36 @@ public readonly struct DbEnum<TEnum> : IEquatable<TEnum>, IEquatable<DbEnum<TEnu
     /// </summary>
     public static implicit operator DbEnum<TEnum>(string name) => new(name);
 
+    /// <inheritdoc/>
+    public static DbEnum<TEnum> Parse(ReadOnlySpan<char> s, IFormatProvider? provider)
+    {
+        if (TryParse(s, provider, out var result))
+            return result;
+
+        throw new FormatException();
+    }
+
+    /// <inheritdoc/>
+    public static bool TryParse(ReadOnlySpan<char> s, IFormatProvider? provider, [MaybeNullWhen(false)] out DbEnum<TEnum> result)
+    {
+        if (EnumInfo<TEnum>.TryParse(s, ignoreCase: true, out var value))
+        {
+            result = value;
+            return true;
+        }
+
+        result = default;
+        return false;
+    }
+
+    /// <inheritdoc/>
+    public static DbEnum<TEnum> Parse(string s, IFormatProvider? provider) => 
+        Parse(s.AsSpan(), provider);
+
+    /// <inheritdoc/>
+    public static bool TryParse([NotNullWhen(true)] string? s, IFormatProvider? provider, [MaybeNullWhen(false)] out DbEnum<TEnum> result) =>
+        TryParse(s.AsSpan(), provider, out result);
+
     /// <summary>
     /// Returns a string that represents the current <see cref="DbEnum{TEnum}"/> value.
     /// </summary>
@@ -137,6 +168,16 @@ public readonly struct DbEnum<TEnum> : IEquatable<TEnum>, IEquatable<DbEnum<TEnu
     {
         return EnumInfo<TEnum>.ToString(this.value);
     }
+
+    /// <inheritdoc/>
+    public bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider) =>
+        format.IsEmpty ? 
+            EnumInfo<TEnum>.TryFormat(this.value, destination, out charsWritten) :
+            Enum.TryFormat(this.value, destination, out charsWritten, format);
+
+    /// <inheritdoc/>
+    public string ToString(string? format, IFormatProvider? formatProvider) =>
+        string.IsNullOrWhiteSpace(format) ? ToString() : this.value.ToString(format);
 
     /// <summary>
     /// Converts the <see cref="DbEnum{TEnum}"/> value to a <see cref="DbString"/> value.
