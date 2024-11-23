@@ -12,10 +12,28 @@ public static class DapperExtensions
     /// </summary>
     /// <param name="str">The string value to convert.</param>
     /// <param name="maxLength">The maximum length of the resulting <see cref="DbString"/> instance.</param>
+    /// <returns>A <see cref="DbString"/> instance with a fixed length, using the ANSI encoding.</returns>
+    public static DbString AsChar(this string? str, int maxLength = -1) =>
+        str.AsChar(maxLength, throwOnMaxLength: false);
+
+    /// <summary>
+    /// Converts a string value to a <see cref="DbString"/> instance with a fixed length, using the ANSI encoding.
+    /// </summary>
+    /// <param name="str">The string value to convert.</param>
+    /// <param name="maxLength">The maximum length of the resulting <see cref="DbString"/> instance.</param>
     /// <param name="throwOnMaxLength">Whether to throw an exception if the maximum length is exceeded.</param>
     /// <returns>A <see cref="DbString"/> instance with a fixed length, using the ANSI encoding.</returns>
-    public static DbString AsChar(this string? str, int maxLength = -1, bool throwOnMaxLength = false) =>
+    public static DbString AsChar(this string? str, int maxLength, bool throwOnMaxLength) =>
         str.AsDbString(maxLength, isFixedLength: true, isAnsi: true, throwOnMaxLength);
+
+    /// <summary>
+    /// Converts a string value to a <see cref="DbString"/> instance with a variable length, using the ANSI encoding.
+    /// </summary>
+    /// <param name="str">The string value to convert.</param>
+    /// <param name="maxLength">The maximum length of the resulting <see cref="DbString"/> instance.</param>
+    /// <returns>A <see cref="DbString"/> instance with a variable length, using the ANSI encoding.</returns>
+    public static DbString AsVarChar(this string? str, int maxLength = -1) =>
+        str.AsVarChar(maxLength, throwOnMaxLength: false);
 
     /// <summary>
     /// Converts a string value to a <see cref="DbString"/> instance with a variable length, using the ANSI encoding.
@@ -24,8 +42,17 @@ public static class DapperExtensions
     /// <param name="maxLength">The maximum length of the resulting <see cref="DbString"/> instance.</param>
     /// <param name="throwOnMaxLength">Whether to throw an exception if the maximum length is exceeded.</param>
     /// <returns>A <see cref="DbString"/> instance with a variable length, using the ANSI encoding.</returns>
-    public static DbString AsVarChar(this string? str, int maxLength = -1, bool throwOnMaxLength = false) =>
+    public static DbString AsVarChar(this string? str, int maxLength, bool throwOnMaxLength) =>
         str.AsDbString(maxLength, isFixedLength: false, isAnsi: true, throwOnMaxLength);
+
+    /// <summary>
+    /// Converts a string value to a <see cref="DbString"/> instance with a fixed length, using the Unicode encoding.
+    /// </summary>
+    /// <param name="str">The string value to convert.</param>
+    /// <param name="maxLength">The maximum length of the resulting <see cref="DbString"/> instance.</param>
+    /// <returns>A <see cref="DbString"/> instance with a fixed length, using the Unicode encoding.</returns>
+    public static DbString AsNChar(this string? str, int maxLength = -1) =>
+        str.AsNChar(maxLength, throwOnMaxLength: false);
 
     /// <summary>
     /// Converts a string value to a <see cref="DbString"/> instance with a fixed length, using the Unicode encoding.
@@ -34,8 +61,17 @@ public static class DapperExtensions
     /// <param name="maxLength">The maximum length of the resulting <see cref="DbString"/> instance.</param>
     /// <param name="throwOnMaxLength">Whether to throw an exception if the maximum length is exceeded.</param>
     /// <returns>A <see cref="DbString"/> instance with a fixed length, using the Unicode encoding.</returns>
-    public static DbString AsNChar(this string? str, int maxLength = -1, bool throwOnMaxLength = false) =>
+    public static DbString AsNChar(this string? str, int maxLength, bool throwOnMaxLength) =>
         str.AsDbString(maxLength, isFixedLength: true, isAnsi: false, throwOnMaxLength);
+
+    /// <summary>
+    /// Converts a string value to a <see cref="DbString"/> instance with a variable length, using the Unicode encoding.
+    /// </summary>
+    /// <param name="str">The string value to convert.</param>
+    /// <param name="maxLength">The maximum length of the resulting <see cref="DbString"/> instance.</param>
+    /// <returns>A <see cref="DbString"/> instance with a variable length, using the Unicode encoding.</returns>
+    public static DbString AsNVarChar(this string? str, int maxLength = -1) =>
+        str.AsNVarChar(maxLength, throwOnMaxLength: false);
 
     /// <summary>
     /// Converts a string value to a <see cref="DbString"/> instance with a variable length, using the Unicode encoding.
@@ -44,7 +80,7 @@ public static class DapperExtensions
     /// <param name="maxLength">The maximum length of the resulting <see cref="DbString"/> instance.</param>
     /// <param name="throwOnMaxLength">Whether to throw an exception if the maximum length is exceeded.</param>
     /// <returns>A <see cref="DbString"/> instance with a variable length, using the Unicode encoding.</returns>
-    public static DbString AsNVarChar(this string? str, int maxLength = -1, bool throwOnMaxLength = false) =>
+    public static DbString AsNVarChar(this string? str, int maxLength, bool throwOnMaxLength) =>
         str.AsDbString(maxLength, isFixedLength: false, isAnsi: false, throwOnMaxLength);
 
     /// <summary>
