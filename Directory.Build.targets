@@ -8,18 +8,23 @@
           Condition="'$(GitBuildNumber)' == ''">
       <Output TaskParameter="ConsoleOutput" PropertyName="GitBuildNumber" />
     </Exec>
+    <Exec Command="git log -1 --format=%%h" ConsoleToMSBuild="true"
+          Condition="'$(GitCommitHash)' == ''">
+      <Output TaskParameter="ConsoleOutput" PropertyName="GitCommitHash" />
+    </Exec>
     <PropertyGroup>
       <GitBranchName Condition="'$(GitBranchName)' == ''"/>
       <GitBuildNumber Condition="'$(GitBuildNumber)' == ''">0</GitBuildNumber>
+      <GitCommitHash Condition="'$(GitCommitHash)' == ''"/>
       <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
       <FileVersion>$(VersionPrefix).$(GitBuildNumber)</FileVersion>
-      <InformationalVersion>$(Version) $(GitBranchName)</InformationalVersion>
+      <InformationalVersion>$(Version)+$(GitBranchName).$(GitCommitHash)</InformationalVersion>
     </PropertyGroup>
   </Target>
   <PropertyGroup>
     <Authors>Vladislav Borovikov</Authors>
     <Company>$(Authors)</Company>
-    <Copyright>Copyright © 2023-2024 Vladislav Borovikov</Copyright>
+    <Copyright>Copyright © 2023-2025 Vladislav Borovikov</Copyright>
     <Product>$(Title)</Product>
     <AssemblyTitle>$(Description)</AssemblyTitle>
   </PropertyGroup>
