@@ -13,7 +13,7 @@ using ScriptMap = System.Collections.Frozen.FrozenDictionary<string, string>;
 /// <summary>
 /// Represents a collection of SQL scripts loaded from an external source.
 /// </summary>
-[DebuggerDisplay("{Source}: {Count}")]
+[DebuggerDisplay("{Source}/{Version}: {Count}")]
 public class DbScriptMap
 {
     private const string ScriptsFileName = "Scripts";
@@ -22,14 +22,16 @@ public class DbScriptMap
     /// <summary>
     /// An empty instance of <see cref="DbScriptMap"/>.
     /// </summary>
-    public static readonly DbScriptMap Empty = new(string.Empty, ScriptMap.Empty);
+    public static readonly DbScriptMap Empty = new(string.Empty, new(), ScriptMap.Empty);
 
     private readonly string source;
+    private readonly Version version;
     private readonly ScriptMap scripts;
 
-    private DbScriptMap(string source, ScriptMap scripts)
+    private DbScriptMap(string source, Version version, ScriptMap scripts)
     {
         this.source = source;
+        this.version = version;
         this.scripts = scripts;
     }
 
@@ -47,6 +49,11 @@ public class DbScriptMap
     /// Gets the source for scripts in the collection.
     /// </summary>
     public string Source => this.source;
+
+    /// <summary>
+    /// Gets the version of the collection.
+    /// </summary>
+    public Version Version => this.version;
 
     /// <summary>
     /// Gets the number of scripts in the collection.
@@ -114,8 +121,8 @@ public class DbScriptMap
 
         if (!string.IsNullOrWhiteSpace(scriptText))
         {
-            var scripts = ParseScripts(scriptText);
-            scriptMap = new(scriptSource, scripts);
+            var scripts = ParseScripts(scriptText, out var version);
+            scriptMap = new(scriptSource, version, scripts);
 
             Debug.WriteLine($"Spryer: {scripts.Count} scripts found in '{scriptSource}'");
             return true;
@@ -168,13 +175,19 @@ public class DbScriptMap
         yield return ScriptsFileName + ScriptsFileExt;
     }
 
-    private static ScriptMap ParseScripts(ReadOnlySpan<char> text)
+    private static ScriptMap ParseScripts(ReadOnlySpan<char> text, out Version version)
     {
         // any sql statements before the first pragma are ignored
         var start = text.IndexOf(Pragma.Prefix, StringComparison.Ordinal);
-        if (start < 0) return ScriptMap.Empty;
+        if (start < 0)
+        {
+            version = Empty.Version;
+            return ScriptMap.Empty;
+        }
+
         text = text[start..];
 
+        var foundVersion = default(Version);
         var scripts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var pragma in EnumeratePragmas(text))
         {
@@ -183,8 +196,13 @@ public class DbScriptMap
                 ref var script = ref CollectionsMarshal.GetValueRefOrAddDefault(scripts, pragma.Meta.ToString(), out _);
                 script = pragma.Data.ToString();
             }
+            else if (pragma.Name.Equals(Pragma.Version, StringComparison.OrdinalIgnoreCase))
+            {
+                Version.TryParse(pragma.Meta, out foundVersion);
+            }
         }
 
+        version = foundVersion ?? Empty.Version;
         return scripts.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
     }
 
@@ -196,7 +214,9 @@ public class DbScriptMap
         public const string Prefix = "--@";
         public const string Suffix = "\n--@";
         public const string AltSuffix = "\r--@";
+
         public const string Script = "script";
+        public const string Version = "version";
 
         public Pragma(ReadOnlySpan<char> name, ReadOnlySpan<char> meta, ReadOnlySpan<char> data)
         {

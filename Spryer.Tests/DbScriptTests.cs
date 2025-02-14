@@ -6,7 +6,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 public class DbScriptTests
 {
     [TestMethod]
-    public void Load_DefaultResource_FoundParsed()
+    public void Load_DefaultResource_FoundScripts()
     {
         var sql = DbScriptMap.Load();
 
@@ -17,5 +17,12 @@ public class DbScriptTests
             WHERE Id = @Id;
             """,
             sql["TestSelect"]);
+    }
+
+    [TestMethod]
+    public void Load_DefaultResource_FoundVersion()
+    {
+        var sql = DbScriptMap.Load();
+        Assert.AreEqual(new Version(1, 0, 1), sql.Version);
     }
 }
