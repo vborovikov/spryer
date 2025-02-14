@@ -246,7 +246,11 @@ public class DbScriptMap
                 {
                     var end = remaining.IndexOf(Pragma.Suffix, StringComparison.Ordinal);
                     if (end < 0)
-                        end = remaining.Length;
+                    {
+                        end = remaining.IndexOf(Pragma.AltSuffix, StringComparison.Ordinal);
+                        if (end < 0)
+                            end = remaining.Length;
+                    }
 
                     var name = remaining[..sep].Trim();
                     var meta = remaining[(sep + 1)..mid].Trim();
