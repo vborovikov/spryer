@@ -4,7 +4,6 @@ using System;
 using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -44,7 +43,7 @@ public sealed class DbScriptMap
     /// <returns>A SQL script with the specified name.</returns>
     public string this[string name]
     {
-        get => scripts[name];
+        get => this.scripts[name];
     }
 
     /// <summary>
@@ -84,7 +83,7 @@ public sealed class DbScriptMap
     }
 
     /// <summary>
-    /// Represents a loader fro the script collection.
+    /// Represents a loader for the script collection.
     /// </summary>
     public class Loader
     {
@@ -253,7 +252,7 @@ public sealed class DbScriptMap
             {
                 if (pragma.Name.Equals(Pragma.Script, StringComparison.OrdinalIgnoreCase))
                 {
-                    ref var script = ref CollectionsMarshal.GetValueRefOrAddDefault(scripts, pragma.Meta.ToString(), out _);
+                    ref var script = ref CollectionsMarshal.GetValueRefOrAddDefault(this.scripts, pragma.Meta.ToString(), out _);
                     script = pragma.Data.ToString();
                     ++count;
                 }
