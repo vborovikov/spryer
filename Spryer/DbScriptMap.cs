@@ -9,7 +9,8 @@ using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
-using ScriptDictionary = System.Collections.Frozen.FrozenDictionary<string, string>;
+using FrozenScripts = System.Collections.Frozen.FrozenDictionary<string, string>;
+using MutableScripts = System.Collections.Generic.Dictionary<string, string>;
 
 /// <summary>
 /// Represents a collection of SQL scripts loaded from an external source.
@@ -23,13 +24,13 @@ public sealed class DbScriptMap
     /// <summary>
     /// An empty instance of <see cref="DbScriptMap"/>.
     /// </summary>
-    public static readonly DbScriptMap Empty = new(string.Empty, new(), ScriptDictionary.Empty);
+    public static readonly DbScriptMap Empty = new(string.Empty, new(), FrozenScripts.Empty);
 
     private readonly string source;
     private readonly Version version;
-    private readonly ScriptDictionary scripts;
+    private readonly FrozenScripts scripts;
 
-    private DbScriptMap(string source, Version version, ScriptDictionary scripts)
+    private DbScriptMap(string source, Version version, FrozenScripts scripts)
     {
         this.source = source;
         this.version = version;
@@ -70,18 +71,16 @@ public sealed class DbScriptMap
     {
         var loader = new Loader { FileName = fileName };
 
-        if (loader.TryLoadScripts())
-            return loader.ScriptMap;
+        loader.Assembly = Assembly.GetCallingAssembly();
+        loader.TryLoadScripts();
 
         loader.Assembly = Assembly.GetEntryAssembly();
-        if (loader.TryLoadScripts())
-            return loader.ScriptMap;
+        loader.TryLoadScripts();
 
-        loader.Assembly = Assembly.GetCallingAssembly();
-        if (loader.TryLoadScripts())
-            return loader.ScriptMap;
+        loader.Assembly = null;
+        loader.TryLoadScripts();
 
-        return Empty;
+        return loader.GetScriptMap();
     }
 
     /// <summary>
@@ -89,6 +88,20 @@ public sealed class DbScriptMap
     /// </summary>
     public class Loader
     {
+        private readonly MutableScripts scripts;
+        private readonly StringBuilder source;
+        private Version version;
+
+        /// <summary>
+        /// Creates a new <see cref="Loader"/> instance.
+        /// </summary>
+        public Loader()
+        {
+            this.scripts = new(StringComparer.OrdinalIgnoreCase);
+            this.source = new();
+            this.version = Empty.Version;
+        }
+
         /// <summary>
         /// Gets or sets the desired file name fro the script collection.
         /// </summary>
@@ -102,13 +115,20 @@ public sealed class DbScriptMap
         /// <summary>
         /// Gets the loaded script collection.
         /// </summary>
-        public DbScriptMap? ScriptMap { get; private set; }
+        public DbScriptMap GetScriptMap()
+        {
+            if (this.scripts.Count > 0)
+            {
+                return new(this.source.ToString(), this.version, this.scripts.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase));
+            }
+
+            return Empty;
+        }
 
         /// <summary>
         /// Tries to load the script collection.
         /// </summary>
         /// <returns><c>true</c> if the script collection is successfully loaded, <c>false</c> otherwise.</returns>
-        [MemberNotNullWhen(true, nameof(ScriptMap))]
         public bool TryLoadScripts()
         {
             foreach (var scriptFileName in EnumerateFileNames())
@@ -143,18 +163,21 @@ public sealed class DbScriptMap
             return false;
         }
 
-        [MemberNotNullWhen(true, nameof(ScriptMap))]
         private bool TryLoadStream(string scriptSource, Stream scriptStream)
         {
             var scriptText = GetScriptText(scriptStream);
 
             if (!string.IsNullOrWhiteSpace(scriptText))
             {
-                var scripts = ParseScripts(scriptText, out var version);
-                this.ScriptMap = new(scriptSource, version, scripts);
+                var scriptCount = ParseScripts(scriptText);
+                Debug.WriteLine($"Spryer: {scriptCount} scripts found in '{scriptSource}'");
+                if (scriptCount > 0)
+                {
+                    if (this.source.Length > 0) this.source.AppendLine();
+                    this.source.Append(scriptSource);
 
-                Debug.WriteLine($"Spryer: {scripts.Count} scripts found in '{scriptSource}'");
-                return true;
+                    return true;
+                }
             }
 
             return false;
@@ -165,7 +188,7 @@ public sealed class DbScriptMap
         /// </summary>
         /// <param name="scriptStream">The script stream.</param>
         /// <returns>A script raw text.</returns>
-        protected virtual string GetScriptText(Stream scriptStream)
+        protected virtual string? GetScriptText(Stream scriptStream)
         {
             using var reader = new StreamReader(scriptStream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: false);
             return reader.ReadToEnd();
@@ -214,35 +237,36 @@ public sealed class DbScriptMap
             yield return ScriptsFileName + ScriptsFileExt;
         }
 
-        private static ScriptDictionary ParseScripts(ReadOnlySpan<char> text, out Version version)
+        private int ParseScripts(ReadOnlySpan<char> text)
         {
             // any sql statements before the first pragma are ignored
             var start = text.IndexOf(Pragma.Prefix, StringComparison.Ordinal);
             if (start < 0)
             {
-                version = Empty.Version;
-                return ScriptDictionary.Empty;
+                return 0;
             }
 
             text = text[start..];
 
-            var foundVersion = default(Version);
-            var scripts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var count = 0;
             foreach (var pragma in EnumeratePragmas(text))
             {
                 if (pragma.Name.Equals(Pragma.Script, StringComparison.OrdinalIgnoreCase))
                 {
                     ref var script = ref CollectionsMarshal.GetValueRefOrAddDefault(scripts, pragma.Meta.ToString(), out _);
                     script = pragma.Data.ToString();
+                    ++count;
                 }
                 else if (pragma.Name.Equals(Pragma.Version, StringComparison.OrdinalIgnoreCase))
                 {
-                    Version.TryParse(pragma.Meta, out foundVersion);
+                    if (Version.TryParse(pragma.Meta, out var foundVersion) && foundVersion > this.version)
+                    {
+                        this.version = foundVersion;
+                    }
                 }
             }
 
-            version = foundVersion ?? Empty.Version;
-            return scripts.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
+            return count;
         }
 
         private static PragmaEnumerator EnumeratePragmas(ReadOnlySpan<char> text) => new(text);
