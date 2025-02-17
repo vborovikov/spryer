@@ -239,7 +239,7 @@ public sealed class DbScriptMap
         private int ParseScripts(ReadOnlySpan<char> text)
         {
             // any sql statements before the first pragma are ignored
-            var start = text.IndexOf(Pragma.Prefix, StringComparison.Ordinal);
+            var start = Pragma.FindMarkerIndex(text);
             if (start < 0)
             {
                 return 0;
@@ -274,9 +274,7 @@ public sealed class DbScriptMap
     [DebuggerDisplay("@{Name,nq} {Meta,nq}")]
     private readonly ref struct Pragma
     {
-        public const string Prefix = "--@";
-        public const string Suffix = "\n--@";
-        public const string AltSuffix = "\r--@";
+        public const string Marker = "--@";
 
         public const string Script = "script";
         public const string Version = "version";
@@ -291,6 +289,34 @@ public sealed class DbScriptMap
         public ReadOnlySpan<char> Name { get; }
         public ReadOnlySpan<char> Meta { get; }
         public ReadOnlySpan<char> Data { get; }
+
+        public static int FindMarkerIndex(ReadOnlySpan<char> span)
+        {
+            var offset = 0;
+            var index = -1;
+
+            while (span.Length > 0)
+            {
+                index = span.IndexOf(Marker, StringComparison.Ordinal);
+                if (index == 0)
+                    break;
+                if (index < 0)
+                    return -1;
+
+                if (index > 0)
+                {
+                    if (span[index - 1] is '\n' or '\r')
+                    {
+                        break;
+                    }
+
+                    offset += index;
+                    span = span[(index + 1)..];
+                }
+            }
+
+            return offset + index;
+        }
     }
 
     private ref struct PragmaEnumerator
@@ -313,26 +339,24 @@ public sealed class DbScriptMap
             if (remaining.IsEmpty)
                 return false;
 
-            var start = remaining.IndexOf(Pragma.Prefix, StringComparison.Ordinal);
+            var start = Pragma.FindMarkerIndex(remaining);
             if (start < 0)
             {
                 this.text = default;
                 return false;
             }
 
-            remaining = remaining[(start + Pragma.Prefix.Length)..];
+            remaining = remaining[(start + Pragma.Marker.Length)..];
             var mid = remaining.IndexOf('\n');
             if (mid > 0)
             {
                 var sep = remaining.IndexOf(' ');
                 if (sep > 0 && sep < mid)
                 {
-                    var end = remaining.IndexOf(Pragma.Suffix, StringComparison.Ordinal);
+                    var end = Pragma.FindMarkerIndex(remaining);
                     if (end < 0)
                     {
-                        end = remaining.IndexOf(Pragma.AltSuffix, StringComparison.Ordinal);
-                        if (end < 0)
-                            end = remaining.Length;
+                        end = remaining.Length;
                     }
 
                     var name = remaining[..sep].Trim();
