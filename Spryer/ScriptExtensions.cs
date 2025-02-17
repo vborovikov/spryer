@@ -1,11 +1,18 @@
 ﻿namespace Spryer;
 
 using System;
+using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 static class ScriptExtensions
 {
+	private static readonly SearchValues<char> Wildcards = SearchValues.Create("*?");
+
+	public static bool HasWildcards(this string name) => name.AsSpan().HasWildcards();
+
+	public static bool HasWildcards(this ReadOnlySpan<char> name) => name.IndexOfAny(Wildcards) >= 0;
+
 	public static bool Matches(this string pattern, ReadOnlySpan<char> name) => pattern.AsSpan().Matches(name);
 
 	public static bool Matches(this ReadOnlySpan<char> pattern, ReadOnlySpan<char> name)
