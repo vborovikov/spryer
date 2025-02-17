@@ -17,47 +17,46 @@ static class ScriptExtensions
 
 		while (patternLen > 0)
 		{
-			switch (patternRef)
+			if (patternRef == '*')
 			{
-				case '*':
-					while (patternLen > 0)
+				while (patternLen > 0)
+				{
+					if (patternRef != '*' && patternRef != '?')
 					{
-						if (patternRef != '*' && patternRef != '?')
-						{
-							break;
-						}
-						else
-						{
-							patternRef = ref Unsafe.Add(ref patternRef, 1);
-							patternLen--;
-						}
+						break;
 					}
-
-					while (nameLen > 0)
+					else
 					{
-						if (patternLen > 0 && char.ToUpperInvariant(nameRef) == char.ToUpperInvariant(patternRef))
-						{
-							break;
-						}
-						else
-						{
-							nameRef = ref Unsafe.Add(ref nameRef, 1);
-							nameLen--;
-						}
+						patternRef = ref Unsafe.Add(ref patternRef, 1);
+						patternLen--;
 					}
+				}
 
-					continue;
+				while (nameLen > 0)
+				{
+					if (patternLen > 0 && char.ToUpperInvariant(nameRef) == char.ToUpperInvariant(patternRef))
+					{
+						break;
+					}
+					else
+					{
+						nameRef = ref Unsafe.Add(ref nameRef, 1);
+						nameLen--;
+					}
+				}
 
-				case '?':
-					if (nameLen == 0)
-						return false;
-					break;
-
-				default:
-					if (nameLen == 0 || char.ToUpperInvariant(nameRef) != char.ToUpperInvariant(patternRef))
-						return false;
-					break;
+				continue;
 			}
+			else
+			{
+				if (nameLen == 0)
+					return false;
+
+				if (patternRef != '?' && char.ToUpperInvariant(nameRef) != char.ToUpperInvariant(patternRef))
+                {
+                    return false;
+                }
+            }
 
 			nameRef = ref Unsafe.Add(ref nameRef, 1);
 			nameLen--;
