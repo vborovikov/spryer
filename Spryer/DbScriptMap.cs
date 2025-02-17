@@ -248,7 +248,7 @@ public sealed class DbScriptMap
             text = text[start..];
 
             var count = 0;
-            foreach (var pragma in EnumeratePragmas(text))
+            foreach (var pragma in Pragma.Enumerate(text))
             {
                 if (pragma.Name.Equals(Pragma.Script, StringComparison.OrdinalIgnoreCase))
                 {
@@ -267,8 +267,6 @@ public sealed class DbScriptMap
 
             return count;
         }
-
-        private static PragmaEnumerator EnumeratePragmas(ReadOnlySpan<char> text) => new(text);
     }
 
     [DebuggerDisplay("@{Name,nq} {Meta,nq}")]
@@ -289,6 +287,8 @@ public sealed class DbScriptMap
         public ReadOnlySpan<char> Name { get; }
         public ReadOnlySpan<char> Meta { get; }
         public ReadOnlySpan<char> Data { get; }
+
+        public static PragmaEnumerator Enumerate(ReadOnlySpan<char> text) => new(text);
 
         public static int FindMarkerIndex(ReadOnlySpan<char> span)
         {
