@@ -5,7 +5,7 @@ using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-static class ScriptExtensions
+static class Globbing
 {
 	private static readonly SearchValues<char> Wildcards = SearchValues.Create("*?");
 
