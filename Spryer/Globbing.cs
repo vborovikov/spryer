@@ -40,6 +40,9 @@ static class Globbing
 					}
 				}
 
+				if (patternLen == 0)
+					return true;
+
 				starLen = patternLen;
 
 				while (nameLen > 0)
