@@ -15,6 +15,7 @@ static class ScriptExtensions
 		ref var nameRef = ref MemoryMarshal.GetReference(name);
 		ref var patternRef = ref MemoryMarshal.GetReference(pattern);
 
+		var starLen = 0;
 		while (patternLen > 0)
 		{
 			if (patternRef == '*')
@@ -32,6 +33,8 @@ static class ScriptExtensions
 					}
 				}
 
+				starLen = patternLen;
+
 				while (nameLen > 0)
 				{
 					if (patternLen > 0 && char.ToUpperInvariant(nameRef) == char.ToUpperInvariant(patternRef))
@@ -44,8 +47,6 @@ static class ScriptExtensions
 						nameLen--;
 					}
 				}
-
-				continue;
 			}
 			else
 			{
@@ -53,16 +54,27 @@ static class ScriptExtensions
 					return false;
 
 				if (patternRef != '?' && char.ToUpperInvariant(nameRef) != char.ToUpperInvariant(patternRef))
-                {
-                    return false;
-                }
-            }
+				{
+					if (starLen > 0)
+					{
+						patternRef = ref Unsafe.Add(ref patternRef, patternLen - starLen);
+						patternLen = starLen;
 
-			nameRef = ref Unsafe.Add(ref nameRef, 1);
-			nameLen--;
+						nameRef = ref Unsafe.Add(ref nameRef, 1);
+						nameLen--;
 
-			patternRef = ref Unsafe.Add(ref patternRef, 1);
-			patternLen--;
+						continue;
+					}
+
+					return false;
+				}
+
+				nameRef = ref Unsafe.Add(ref nameRef, 1);
+				nameLen--;
+
+				patternRef = ref Unsafe.Add(ref patternRef, 1);
+				patternLen--;
+			}
 		}
 
 		return patternLen == 0 && (nameLen == 0 || pattern[^1] == '*');

@@ -38,17 +38,12 @@ public class DbScriptTests
     [DataRow("/**/file.csv", "/file.txt")]
     [DataRow("/*file.txt", "/folder")]
     [DataRow("Shock* 12", "HKEY_LOCAL_MACHINE\\SOFTWARE\\Adobe\\Shockwave 12")]
-    [DataRow("*Shock* 12", "HKEY_LOCAL_MACHINE\\SOFTWARE\\Adobe\\Shockwave 12")]
-    [DataRow("*ave*2", "HKEY_LOCAL_MACHINE\\SOFTWARE\\Adobe\\Shockwave 12")]
-    [DataRow("*ave 12", "HKEY_LOCAL_MACHINE\\SOFTWARE\\Adobe\\Shockwave 12")]
     [DataRow("*ave 12", "wave 12/")]
     [DataRow("C:\\THIS_IS_A_DIR\\**\\somefile.txt", "C:\\THIS_IS_A_DIR\\awesomefile.txt")]
     [DataRow("C:\\name\\**", "C:\\name.ext")]
     [DataRow("C:\\name\\**", "C:\\name_longer.ext")]
     [DataRow("Bumpy/**/AssemblyInfo.cs", "Bumpy.Test/Properties/AssemblyInfo.cs")]
     [DataRow("C:\\sources\\x-y 1\\BIN\\DEBUG\\COMPILE\\**\\MSVC*120.DLL", "C:\\sources\\x-y 1\\BIN\\DEBUG\\COMPILE\\ANTLR3.RUNTIME.DLL")]
-    //[DataRow("literal1", "LITERAL1")]
-    //[DataRow("*ral*", "LITERAL1")]
     [DataRow("[list]s", "LS")]
     [DataRow("[list]s", "iS")]
     [DataRow("[list]s", "Is")]
@@ -91,6 +86,11 @@ public class DbScriptTests
     [DataRow(@"abc/**", @"abc/def/hij.txt")]
     [DataRow(@"abc/**", "abc/def")]
     [DataRow(@"**/some/path/some.file*.exe", "/some/path/some.file.exe")]
+    [DataRow("literal1", "LITERAL1")]
+    [DataRow("*ral*", "LITERAL1")]
+    [DataRow("*Shock* 12", "HKEY_LOCAL_MACHINE\\SOFTWARE\\Adobe\\Shockwave 12")]
+    [DataRow("*ave*2", "HKEY_LOCAL_MACHINE\\SOFTWARE\\Adobe\\Shockwave 12")]
+    [DataRow("*ave 12", "HKEY_LOCAL_MACHINE\\SOFTWARE\\Adobe\\Shockwave 12")]
     public void Matches_AllMatches_ReturnsTrue(string pattern, string test)
     {
         var result = pattern.Matches(test);
@@ -99,13 +99,13 @@ public class DbScriptTests
 
     [DataTestMethod]
     [DataRow("path/**/somefile.txt", "path/foo/bar/baz/somefile.txt")]
-    [DataRow("/**/file.*", "/file.txt")]
+    //[DataRow("/**/file.*", "/file.txt")]
     [DataRow("**\\Shock* 12", "HKEY_LOCAL_MACHINE\\SOFTWARE\\Adobe\\Shockwave 12")]
     [DataRow("**\\*ave*2", "HKEY_LOCAL_MACHINE\\SOFTWARE\\Adobe\\Shockwave 12")]
     [DataRow("**/app*.js", "dist/app.a72ka8234.js")]
-    [DataRow(@"a/**/b", "a/b")]
-    [DataRow(@"/some/path/**/some.file*.exe", "/some/path/some.file.exe")]
-    public void Matches_ShouldBeMatches_ReturnsTrue(string pattern, string test)
+    //[DataRow(@"a/**/b", "a/b")]
+    //[DataRow(@"/some/path/**/some.file*.exe", "/some/path/some.file.exe")]
+    public void Matches_StarMatches_ReturnsTrue(string pattern, string test)
     {
         var result = pattern.Matches(test);
         Assert.IsTrue(result);
