@@ -29,7 +29,7 @@ static class Globbing
 			{
 				while (patternLen > 0)
 				{
-					if (patternRef != '*' && patternRef != '?')
+					if (patternRef != '*')
 					{
 						break;
 					}
@@ -44,6 +44,9 @@ static class Globbing
 					return true;
 
 				starLen = patternLen;
+
+				if (patternRef == '?')
+					continue;
 
 				while (nameLen > 0)
 				{
