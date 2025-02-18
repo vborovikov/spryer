@@ -2,6 +2,7 @@
 
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -9,9 +10,9 @@ static class Globbing
 {
 	private static readonly SearchValues<char> Wildcards = SearchValues.Create("*?");
 
-	public static bool HasWildcards(this string name) => name.AsSpan().HasWildcards();
+	public static bool HasWildcard([NotNullWhen(true)] this string? name) => name.AsSpan().HasWildcard();
 
-	public static bool HasWildcards(this ReadOnlySpan<char> name) => name.Length > 0 && name.IndexOfAny(Wildcards) >= 0;
+	public static bool HasWildcard(this ReadOnlySpan<char> name) => name.Length > 0 && name.IndexOfAny(Wildcards) >= 0;
 
 	public static bool Matches(this string pattern, ReadOnlySpan<char> name) => pattern.AsSpan().Matches(name);
 

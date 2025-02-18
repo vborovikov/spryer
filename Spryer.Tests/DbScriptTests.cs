@@ -117,8 +117,9 @@ public class DbScriptTests
     [DataRow("script.sql", false)]
     [DataRow("", false)]
     [DataRow("scrip?.sql", true)]
+    [DataRow("script.[cs]ql", false)]
     public void HasWildcards_Patterns_Detected(string pattern, bool flag)
     {
-        Assert.AreEqual(flag, pattern.HasWildcards());
+        Assert.AreEqual(flag, pattern.HasWildcard());
     }
 }
