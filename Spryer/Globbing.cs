@@ -11,7 +11,7 @@ static class Globbing
 
 	public static bool HasWildcards(this string name) => name.AsSpan().HasWildcards();
 
-	public static bool HasWildcards(this ReadOnlySpan<char> name) => name.IndexOfAny(Wildcards) >= 0;
+	public static bool HasWildcards(this ReadOnlySpan<char> name) => name.Length > 0 && name.IndexOfAny(Wildcards) >= 0;
 
 	public static bool Matches(this string pattern, ReadOnlySpan<char> name) => pattern.AsSpan().Matches(name);
 

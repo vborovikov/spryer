@@ -111,4 +111,14 @@ public class DbScriptTests
         Assert.IsTrue(result);
     }
 
+    [DataTestMethod]
+    [DataRow("*.*", true)]
+    [DataRow("*.sql", true)]
+    [DataRow("script.sql", false)]
+    [DataRow("", false)]
+    [DataRow("scrip?.sql", true)]
+    public void HasWildcards_Patterns_Detected(string pattern, bool flag)
+    {
+        Assert.AreEqual(flag, pattern.HasWildcards());
+    }
 }
