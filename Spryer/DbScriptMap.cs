@@ -1,10 +1,13 @@
 ﻿namespace Spryer;
 
 using System;
+using System.Buffers;
 using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.IO.Enumeration;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -130,36 +133,68 @@ public sealed class DbScriptMap
         /// <returns><c>true</c> if the script collection is successfully loaded, <c>false</c> otherwise.</returns>
         public bool TryLoadScripts()
         {
-            foreach (var scriptFileName in EnumerateFileNames())
+            var result = false;
+
+            if (this.FileName.HasWildcard())
             {
-                if (string.IsNullOrWhiteSpace(scriptFileName))
-                    continue;
+                // loading every file that matches the file name pattern in order:
 
-                // scripts are loaded from the external files or the assembly resources
-
-                foreach (var scriptFilePath in EnumerateFilePaths(scriptFileName))
+                // - assembly resources
+                if (this.Assembly is not null)
                 {
-                    if (string.IsNullOrWhiteSpace(scriptFilePath))
-                        continue;
-
-
-                    Debug.WriteLine($"Spryer: looking for '{scriptFilePath}'");
-
-                    if (File.Exists(scriptFilePath) && TryLoadStream(scriptFilePath, File.OpenRead(scriptFilePath)))
+                    var resourceNames = this.Assembly.GetManifestResourceNames();
+                    var commonPrefixLength = resourceNames.CommonPrefixLength();
+                    foreach (var resourceName in resourceNames)
                     {
-                        return true;
+                        var resourceNameSpan = resourceName.AsSpan();
+                        if (commonPrefixLength > 0)
+                            resourceNameSpan = resourceNameSpan[commonPrefixLength..];
+
+                        if (FileSystemName.MatchesSimpleExpression(this.FileName, resourceNameSpan) &&
+                            this.Assembly.GetManifestResourceStream(resourceName) is Stream resourceStream)
+                        {
+                            result = result || TryLoadStream(resourceName, resourceStream);
+                        }
                     }
                 }
 
-                if (this.Assembly is not null &&
-                    Array.Find(this.Assembly.GetManifestResourceNames(), n => n.EndsWith(scriptFileName, StringComparison.OrdinalIgnoreCase)) is string resourceName &&
-                    this.Assembly.GetManifestResourceStream(resourceName) is Stream resourceStream && TryLoadStream(resourceName, resourceStream))
+                // - app directories
+                foreach (var scriptFilePath in FindFilePaths(this.FileName))
                 {
-                    return true;
+                    result = result || TryLoadStream(scriptFilePath, File.OpenRead(scriptFilePath));
+                }
+            }
+            else
+            {
+                // loading the first files that have the given file name or the default one from:
+
+                foreach (var scriptFileName in EnumerateFileNames())
+                {
+                    if (string.IsNullOrWhiteSpace(scriptFileName))
+                        continue;
+
+                    // the assembly resources
+                    if (this.Assembly is not null &&
+                        Array.Find(this.Assembly.GetManifestResourceNames(), n => n.EndsWith(scriptFileName, StringComparison.OrdinalIgnoreCase)) is string resourceName &&
+                        this.Assembly.GetManifestResourceStream(resourceName) is Stream resourceStream)
+                    {
+                        result = result || TryLoadStream(resourceName, resourceStream);
+                    }
+
+                    // and the app directories
+                    foreach (var scriptFilePath in EnumerateFilePaths(scriptFileName))
+                    {
+                        Debug.WriteLine($"Spryer: looking for '{scriptFilePath}'");
+
+                        if (File.Exists(scriptFilePath) && TryLoadStream(scriptFilePath, File.OpenRead(scriptFilePath)))
+                        {
+                            return result || true;
+                        }
+                    }
                 }
             }
 
-            return false;
+            return result;
         }
 
         private bool TryLoadStream(string scriptSource, Stream scriptStream)
@@ -193,22 +228,62 @@ public sealed class DbScriptMap
             return reader.ReadToEnd();
         }
 
-        private IEnumerable<string?> EnumerateFilePaths(string scriptFileName)
+        private IEnumerable<string> FindFilePaths(string fileName)
         {
             if (this.Assembly is not null)
             {
+                // local app data: %AppData%\Local\<Assembly>\
+                var localAppData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    this.Assembly.GetName().Name!);
+                foreach (var foundFileName in Directory.EnumerateFiles(localAppData, fileName))
+                    yield return foundFileName;
+
+                // assembly directory
+                if (Path.GetDirectoryName(this.Assembly.Location) is { Length: > 0 } assemblyDir)
+                {
+                    foreach (var foundFileName in Directory.EnumerateFiles(assemblyDir, fileName))
+                        yield return foundFileName;
+                }
+            }
+            else
+            {
+                // local app data: %AppData%\Local\<Process>\
+                if (Path.GetFileNameWithoutExtension(Environment.ProcessPath) is { Length: > 0 } processName)
+                {
+                    var localAppData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), processName);
+                    foreach (var foundFileName in Directory.EnumerateFiles(localAppData, fileName))
+                        yield return foundFileName;
+                }
+
+                // process directory
+                if (Path.GetDirectoryName(Environment.ProcessPath) is { Length: > 0 } processDir)
+                {
+                    foreach (var foundFileName in Directory.EnumerateFiles(processDir, fileName))
+                        yield return foundFileName;
+                }
+            }
+        }
+
+        private IEnumerable<string> EnumerateFilePaths(string scriptFileName)
+        {
+            if (this.Assembly is not null)
+            {
+                // assembly directory
                 if (Path.GetDirectoryName(this.Assembly.Location) is { Length: > 0 } assemblyDir)
                     yield return Path.Combine(assemblyDir, scriptFileName);
 
+                // local app data: %AppData%\Local\<Assembly>\
                 yield return Path.Combine(
                     Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), this.Assembly.GetName().Name!),
                     scriptFileName);
             }
             else
             {
+                // process directory
                 if (Path.GetDirectoryName(Environment.ProcessPath) is { Length: > 0 } processDir)
                     yield return Path.Combine(processDir, scriptFileName);
 
+                // local app data: %AppData%\Local\<Process>\
                 if (Path.GetFileNameWithoutExtension(Environment.ProcessPath) is { Length: > 0 } processName)
                 {
                     yield return Path.Combine(
@@ -372,5 +447,33 @@ public sealed class DbScriptMap
             this.text = remaining;
             return false;
         }
+    }
+}
+
+static class Globbing
+{
+    private static readonly SearchValues<char> Wildcards = SearchValues.Create("*?");
+
+    public static bool HasWildcard([NotNullWhen(true)] this string? name) => name.AsSpan().HasWildcard();
+
+    public static bool HasWildcard(this ReadOnlySpan<char> name) => name.Length > 0 && name.IndexOfAny(Wildcards) >= 0;
+
+    public static int CommonPrefixLength(this string[] names)
+    {
+        if (names.Length < 2)
+            return 0;
+
+        var i = 1;
+        var name = names[0].AsSpan();
+        var commonPrefixLength = name.Length;
+
+        while (i < names.Length)
+        {
+            commonPrefixLength = Math.Min(commonPrefixLength, name.CommonPrefixLength(names[i++]));
+            if (commonPrefixLength == 0)
+                return 0;
+        }
+
+        return commonPrefixLength;
     }
 }
