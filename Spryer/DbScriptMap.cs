@@ -133,7 +133,7 @@ public sealed class DbScriptMap
         /// <returns><c>true</c> if the script collection is successfully loaded, <c>false</c> otherwise.</returns>
         public bool TryLoadScripts()
         {
-            var result = false;
+            var count = 0;
 
             if (this.FileName.HasWildcard())
             {
@@ -151,9 +151,10 @@ public sealed class DbScriptMap
                             resourceNameSpan = resourceNameSpan[commonPrefixLength..];
 
                         if (FileSystemName.MatchesSimpleExpression(this.FileName, resourceNameSpan) &&
-                            this.Assembly.GetManifestResourceStream(resourceName) is Stream resourceStream)
+                            this.Assembly.GetManifestResourceStream(resourceName) is Stream resourceStream &&
+                            TryLoadStream(resourceName, resourceStream))
                         {
-                            result = result || TryLoadStream(resourceName, resourceStream);
+                            ++count;
                         }
                     }
                 }
@@ -161,40 +162,43 @@ public sealed class DbScriptMap
                 // - app directories
                 foreach (var scriptFilePath in FindFilePaths(this.FileName))
                 {
-                    result = result || TryLoadStream(scriptFilePath, File.OpenRead(scriptFilePath));
+                    if (TryLoadStream(scriptFilePath, File.OpenRead(scriptFilePath)))
+                        ++count;
                 }
             }
             else
             {
-                // loading the first files that have the given file name or the default one from:
+                // loading any file that has the given file name or the default one
 
                 foreach (var scriptFileName in EnumerateFileNames())
                 {
                     if (string.IsNullOrWhiteSpace(scriptFileName))
                         continue;
 
-                    // the assembly resources
+                    // every file from the assembly resources
                     if (this.Assembly is not null &&
                         Array.Find(this.Assembly.GetManifestResourceNames(), n => n.EndsWith(scriptFileName, StringComparison.OrdinalIgnoreCase)) is string resourceName &&
-                        this.Assembly.GetManifestResourceStream(resourceName) is Stream resourceStream)
+                        this.Assembly.GetManifestResourceStream(resourceName) is Stream resourceStream &&
+                        TryLoadStream(resourceName, resourceStream))
                     {
-                        result = result || TryLoadStream(resourceName, resourceStream);
+                        ++count;
                     }
 
-                    // and the app directories
+                    // first existing file from the app directories
                     foreach (var scriptFilePath in EnumerateFilePaths(scriptFileName))
                     {
                         Debug.WriteLine($"Spryer: looking for '{scriptFilePath}'");
 
                         if (File.Exists(scriptFilePath) && TryLoadStream(scriptFilePath, File.OpenRead(scriptFilePath)))
                         {
-                            return result || true;
+                            ++count;
+                            break;
                         }
                     }
                 }
             }
 
-            return result;
+            return count > 0;
         }
 
         private bool TryLoadStream(string scriptSource, Stream scriptStream)
@@ -233,10 +237,14 @@ public sealed class DbScriptMap
             if (this.Assembly is not null)
             {
                 // local app data: %AppData%\Local\<Assembly>\
-                var localAppData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                var localAppData = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                     this.Assembly.GetName().Name!);
-                foreach (var foundFileName in Directory.EnumerateFiles(localAppData, fileName))
-                    yield return foundFileName;
+                if (Directory.Exists(localAppData))
+                {
+                    foreach (var foundFileName in Directory.EnumerateFiles(localAppData, fileName))
+                        yield return foundFileName;
+                }
 
                 // assembly directory
                 if (Path.GetDirectoryName(this.Assembly.Location) is { Length: > 0 } assemblyDir)
@@ -251,8 +259,11 @@ public sealed class DbScriptMap
                 if (Path.GetFileNameWithoutExtension(Environment.ProcessPath) is { Length: > 0 } processName)
                 {
                     var localAppData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), processName);
-                    foreach (var foundFileName in Directory.EnumerateFiles(localAppData, fileName))
-                        yield return foundFileName;
+                    if (Directory.Exists(localAppData))
+                    {
+                        foreach (var foundFileName in Directory.EnumerateFiles(localAppData, fileName))
+                            yield return foundFileName;
+                    }
                 }
 
                 // process directory
@@ -295,20 +306,24 @@ public sealed class DbScriptMap
 
         private IEnumerable<string?> EnumerateFileNames()
         {
-            if (!string.IsNullOrWhiteSpace(this.FileName))
-                yield return this.FileName;
-
-            yield return Path.ChangeExtension(Path.GetFileName(Environment.ProcessPath), ScriptsFileExt);
-            yield return Path.GetFileNameWithoutExtension(Environment.ProcessPath) + "." + ScriptsFileName + ScriptsFileExt;
-
-            if (this.Assembly is not null)
+            if (!string.IsNullOrWhiteSpace(this.FileName) && !this.FileName.HasWildcard())
             {
-                yield return this.Assembly.GetName().Name + ScriptsFileExt;
-                yield return this.Assembly.GetName().Name + "." + ScriptsFileName + ScriptsFileExt;
-                yield return Path.ChangeExtension(Path.GetFileName(this.Assembly.Location), ScriptsFileExt);
+                yield return this.FileName;
             }
+            else
+            {
+                yield return Path.ChangeExtension(Path.GetFileName(Environment.ProcessPath), ScriptsFileExt);
+                yield return Path.GetFileNameWithoutExtension(Environment.ProcessPath) + "." + ScriptsFileName + ScriptsFileExt;
 
-            yield return ScriptsFileName + ScriptsFileExt;
+                if (this.Assembly is not null)
+                {
+                    yield return this.Assembly.GetName().Name + ScriptsFileExt;
+                    yield return this.Assembly.GetName().Name + "." + ScriptsFileName + ScriptsFileExt;
+                    yield return Path.ChangeExtension(Path.GetFileName(this.Assembly.Location), ScriptsFileExt);
+                }
+
+                yield return ScriptsFileName + ScriptsFileExt;
+            }
         }
 
         private int ParseScripts(ReadOnlySpan<char> text)

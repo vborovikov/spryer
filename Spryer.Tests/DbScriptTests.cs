@@ -26,6 +26,13 @@ public class DbScriptTests
         Assert.AreEqual(new Version(1, 0, 1), sql.Version);
     }
 
+    [TestMethod]
+    public void Load_Wildcard_Loaded()
+    {
+        var sql = DbScriptMap.Load("Test?.sql");
+        Assert.AreEqual(2, sql.Count);
+    }
+
     [DataTestMethod]
     [DataRow("*.*", true)]
     [DataRow("*.sql", true)]

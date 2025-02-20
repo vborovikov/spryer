@@ -9,7 +9,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Scripts.sql" />
+    <EmbeddedResource Include="Samples\Scripts.sql" />
+    <EmbeddedResource Include="Samples\Test1.sql" />
+    <EmbeddedResource Include="Samples\Test2.sql" />
   </ItemGroup>
 
   <ItemGroup>
