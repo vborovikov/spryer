@@ -362,6 +362,9 @@ public sealed class DbScriptMap
     [DebuggerDisplay("@{Name,nq} {Meta,nq}")]
     private readonly ref struct Pragma
     {
+        private const string CommentStart = "/*";
+        private const string CommentEnd = "*/";
+
         public const string Marker = "--@";
 
         public const string Script = "script";
@@ -384,6 +387,8 @@ public sealed class DbScriptMap
         {
             var offset = 0;
             var index = -1;
+
+            //todo: take into account multiline comments
 
             while (span.Length > 0)
             {
@@ -426,40 +431,37 @@ public sealed class DbScriptMap
         public bool MoveNext()
         {
             var remaining = this.text;
-            if (remaining.IsEmpty)
-                return false;
-
-            var start = Pragma.FindMarkerIndex(remaining);
-            if (start < 0)
+            while (remaining.Length > 0)
             {
-                this.text = default;
-                return false;
-            }
+                var start = Pragma.FindMarkerIndex(remaining);
+                if (start < 0)
+                    break;
 
-            remaining = remaining[(start + Pragma.Marker.Length)..];
-            var mid = remaining.IndexOf('\n');
-            if (mid > 0)
-            {
-                var sep = remaining.IndexOf(' ');
-                if (sep > 0 && sep < mid)
+                remaining = remaining[(start + Pragma.Marker.Length)..];
+                var mid = remaining.IndexOf('\n');
+                if (mid > 0)
                 {
-                    var end = Pragma.FindMarkerIndex(remaining);
-                    if (end < 0)
+                    var sep = remaining.IndexOf(' ');
+                    if (sep > 0 && sep < mid)
                     {
-                        end = remaining.Length;
+                        var end = Pragma.FindMarkerIndex(remaining);
+                        if (end < 0)
+                        {
+                            end = remaining.Length;
+                        }
+
+                        var name = remaining[..sep].Trim();
+                        var meta = remaining[(sep + 1)..mid].Trim();
+                        var data = remaining[mid..end].Trim();
+                        this.current = new Pragma(name, meta, data);
+
+                        this.text = remaining[end..];
+                        return true;
                     }
-
-                    var name = remaining[..sep].Trim();
-                    var meta = remaining[(sep + 1)..mid].Trim();
-                    var data = remaining[mid..end].Trim();
-                    this.current = new Pragma(name, meta, data);
-
-                    this.text = remaining[end..];
-                    return true;
                 }
             }
 
-            this.text = remaining;
+            this.text = default;
             return false;
         }
     }
