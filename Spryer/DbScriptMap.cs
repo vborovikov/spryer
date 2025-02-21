@@ -46,7 +46,7 @@ public sealed class DbScriptMap
     /// <returns>A SQL script with the specified name.</returns>
     public string this[string name]
     {
-        get => this.scripts[name];
+        get => this.scripts.GetValueOrDefault(name, string.Empty);
     }
 
     /// <summary>
