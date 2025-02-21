@@ -44,4 +44,32 @@ public class DbScriptTests
     {
         Assert.AreEqual(flag, pattern.HasWildcard());
     }
+
+    [TestMethod]
+    public void Load_PragmaInComment_ShouldntExist()
+    {
+        var sql = DbScriptMap.Load("Wrong.sql");
+        Assert.AreEqual("", sql["ShouldntExist"]);
+    }
+
+    [TestMethod]
+    public void Load_MultipleVersions_LatestVersion()
+    {
+        var sql = DbScriptMap.Load("Wrong.sql");
+        Assert.AreEqual(new Version(0, 0, 2), sql.Version);
+    }
+
+    [TestMethod]
+    public void Load_ScriptNameWithSpacesInQuotes_Parsed()
+    {
+        var sql = DbScriptMap.Load("Wrong.sql");
+        Assert.AreNotEqual("", sql["Name Space"]);
+    }
+
+    [TestMethod]
+    public void Load_SpaceBeforePragmaName_Parsed()
+    {
+        var sql = DbScriptMap.Load("Wrong.sql");
+        Assert.AreNotEqual("", sql["PragmaSpaces"]);
+    }
 }
