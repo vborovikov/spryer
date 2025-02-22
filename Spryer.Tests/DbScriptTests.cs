@@ -70,6 +70,13 @@ public class DbScriptTests
     public void Load_SpaceBeforePragmaName_Parsed()
     {
         var sql = DbScriptMap.Load("Wrong.sql");
-        Assert.AreNotEqual("", sql["PragmaSpaces"]);
+        Assert.AreNotEqual("", sql["PragmaSpacesSimpleMeta"]);
+    }
+
+    [TestMethod]
+    public void Load_SpaceBeforePragmaFullMeta_Parsed()
+    {
+        var sql = DbScriptMap.Load("Wrong.sql");
+        Assert.AreNotEqual("", sql["PragmaSpacesFullMeta"]);
     }
 }

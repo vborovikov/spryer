@@ -342,6 +342,8 @@ public sealed class DbScriptMap
             {
                 if (pragma.Name.Equals(Pragma.Script, StringComparison.OrdinalIgnoreCase))
                 {
+                    //todo: parse meta
+
                     ref var script = ref CollectionsMarshal.GetValueRefOrAddDefault(this.scripts, pragma.Meta.ToString(), out _);
                     script = pragma.Data.ToString();
                     ++count;
@@ -420,6 +422,21 @@ public sealed class DbScriptMap
             return offset + index;
         }
 
+        internal static Range FindNameRange(ReadOnlySpan<char> span)
+        {
+            var start = span.IndexOfAnyExcept(' ');
+            if (start >= 0)
+            {
+                var end = span[start..].IndexOf(' ');
+                if (end > 0)
+                {
+                    return start..(start + end);
+                }
+            }
+
+            return default;
+        }
+
         private static bool IndexInsideComments(int index, ReadOnlySpan<char> span, out Range commentRange)
         {
             var start = span.IndexOf("/*", StringComparison.Ordinal);
@@ -477,6 +494,8 @@ public sealed class DbScriptMap
 
     private ref struct PragmaEnumerator
     {
+        private static readonly SearchValues<char> NewLineChars = SearchValues.Create("\r\n");
+
         private ReadOnlySpan<char> text;
         private Pragma current;
 
@@ -499,11 +518,11 @@ public sealed class DbScriptMap
                     break;
 
                 remaining = remaining[(start + Pragma.Marker.Length)..];
-                var mid = remaining.IndexOf('\n');
+                var mid = remaining.IndexOfAny(NewLineChars);
                 if (mid > 0)
                 {
-                    var sep = remaining.IndexOf(' ');
-                    if (sep > 0 && sep < mid)
+                    var nr = Pragma.FindNameRange(remaining);
+                    if (!nr.Equals(default) && nr.End.GetOffset(remaining.Length) < mid)
                     {
                         var end = Pragma.FindMarkerIndex(remaining);
                         if (end < 0)
@@ -511,8 +530,8 @@ public sealed class DbScriptMap
                             end = remaining.Length;
                         }
 
-                        var name = remaining[..sep].Trim();
-                        var meta = remaining[(sep + 1)..mid].Trim();
+                        var name = remaining[nr].Trim();
+                        var meta = remaining[nr.End..mid].Trim();
                         var data = remaining[mid..end].Trim();
                         this.current = new Pragma(name, meta, data);
 

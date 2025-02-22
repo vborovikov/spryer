@@ -9,7 +9,7 @@ from aTable;
 
 */
 
---@ script  PragmaSpaces  (@Param1, @Param2)
+--@ script  PragmaSpacesFullMeta  (@Param1, @Param2)
 select t.*
 from aTable t
 where t.Column1 = @Param1 and t.Column2 = @Param2;
@@ -20,6 +20,13 @@ where t.Column1 = @Param1 and t.Column2 = @Param2;
 --@
 
 --@script  "Name Space"  (@Param1, @Param2)
+select t.*
+from aTable t
+where t.Column1 = @Param1 and t.Column2 = @Param2;
+
+--@
+
+--@ script  PragmaSpacesSimpleMeta
 select t.*
 from aTable t
 where t.Column1 = @Param1 and t.Column2 = @Param2;
