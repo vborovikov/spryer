@@ -362,9 +362,6 @@ public sealed class DbScriptMap
     [DebuggerDisplay("@{Name,nq} {Meta,nq}")]
     private readonly ref struct Pragma
     {
-        private const string CommentStart = "/*";
-        private const string CommentEnd = "*/";
-
         public const string Marker = "--@";
 
         public const string Script = "script";
@@ -383,23 +380,33 @@ public sealed class DbScriptMap
 
         public static PragmaEnumerator Enumerate(ReadOnlySpan<char> text) => new(text);
 
-        public static int FindMarkerIndex(ReadOnlySpan<char> span)
+        public static int FindMarkerIndex(ReadOnlySpan<char> text)
         {
             var offset = 0;
             var index = -1;
 
-            //todo: take into account multiline comments
-
+            var span = text;
             while (span.Length > 0)
             {
                 index = span.IndexOf(Marker, StringComparison.Ordinal);
                 if (index == 0)
-                    break;
+                    return offset;
                 if (index < 0)
                     return -1;
 
                 if (index > 0)
                 {
+                    if (IndexInsideComments(index, span, out var commentRange))
+                    {
+                        if (commentRange.Equals(Range.All))
+                            return -1;
+                        
+                        offset += commentRange.End.GetOffset(span.Length) - 1;
+                        span = span[commentRange.End..];
+                        
+                        continue;
+                    }
+
                     if (span[index - 1] is '\n' or '\r')
                     {
                         break;
@@ -411,6 +418,60 @@ public sealed class DbScriptMap
             }
 
             return offset + index;
+        }
+
+        private static bool IndexInsideComments(int index, ReadOnlySpan<char> span, out Range commentRange)
+        {
+            var start = span.IndexOf("/*", StringComparison.Ordinal);
+            if (start < 0 || start > index)
+            {
+                commentRange = default;
+                return false;
+            }
+
+            var offset = 0;
+            var comment = 0;
+            while (span.Length > 0)
+            {
+                var end = span.IndexOf('*');
+                if (end <= 0)
+                    break;
+
+                if (span[end - 1] == '/')
+                {
+                    // comment start
+                    ++comment;
+                    ++end;
+                }
+                else if (span.Length - end > 1 && span[end + 1] == '/')
+                {
+                    // comment end
+                    --comment;
+                    end += 2;
+                }
+                else
+                {
+                    ++end;
+                }
+
+                if (comment == 0)
+                {
+                    commentRange = start..(offset + end);
+                    return true;
+                }
+                else if (end == span.Length)
+                {
+                    break;
+                }
+                else
+                {
+                    offset += end - 1;
+                    span = span[end..];
+                }
+            }
+
+            commentRange = Range.All;
+            return true;
         }
     }
 
