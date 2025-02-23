@@ -9,6 +9,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.IO.Enumeration;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using FrozenScripts = System.Collections.Frozen.FrozenDictionary<string, string>;
@@ -342,9 +343,7 @@ public sealed class DbScriptMap
             {
                 if (pragma.Name.Equals(Pragma.Script, StringComparison.OrdinalIgnoreCase))
                 {
-                    //todo: parse meta
-
-                    ref var script = ref CollectionsMarshal.GetValueRefOrAddDefault(this.scripts, pragma.Meta.ToString(), out _);
+                    ref var script = ref CollectionsMarshal.GetValueRefOrAddDefault(this.scripts, pragma.GetMetaName(), out _);
                     script = pragma.Data.ToString();
                     ++count;
                 }
@@ -379,6 +378,17 @@ public sealed class DbScriptMap
         public ReadOnlySpan<char> Name { get; }
         public ReadOnlySpan<char> Meta { get; }
         public ReadOnlySpan<char> Data { get; }
+
+        public string GetMetaName()
+        {
+            var meta = this.Meta;
+
+            var end = meta.IndexOfUnquoted(' ', '"');
+            if (end > 0)
+                meta = meta[0] == '"' && end > 2 ? meta[1..(end - 1)] : meta[..end];
+
+            return meta.ToString();
+        }
 
         public static PragmaEnumerator Enumerate(ReadOnlySpan<char> text) => new(text);
 
@@ -572,5 +582,26 @@ static class Globbing
         }
 
         return commonPrefixLength;
+    }
+
+    public static int IndexOfUnquoted(this ReadOnlySpan<char> span, char value, char quote, bool quoted = false)
+    {
+        var len = span.Length;
+        if (len == 0) return -1;
+
+        ref char src = ref MemoryMarshal.GetReference(span);
+        while (len > 0)
+        {
+            quoted ^= src == quote;
+            if (!quoted && src == value)
+            {
+                return span.Length - len;
+            }
+
+            src = ref Unsafe.Add(ref src, 1);
+            --len;
+        }
+
+        return -1;
     }
 }
