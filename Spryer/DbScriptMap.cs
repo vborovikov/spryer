@@ -24,21 +24,19 @@ public sealed class DbScriptMap
     private const string ScriptsFileName = "Scripts";
     private const string ScriptsFileExt = ".sql";
 
-    /// <summary>
-    /// An empty instance of <see cref="DbScriptMap"/>.
-    /// </summary>
-    public static readonly DbScriptMap Empty = new(string.Empty, new(), FrozenScripts.Empty);
-
-    private readonly string source;
-    private readonly Version version;
     private readonly FrozenScripts scripts;
 
     private DbScriptMap(string source, Version version, FrozenScripts scripts)
     {
-        this.source = source;
-        this.version = version;
+        this.Source = source;
+        this.Version = version;
         this.scripts = scripts;
     }
+
+    /// <summary>
+    /// An empty instance of <see cref="DbScriptMap"/>.
+    /// </summary>
+    public static readonly DbScriptMap Empty = new(string.Empty, new(), FrozenScripts.Empty);
 
     /// <summary>
     /// Gets the SQL script with the specified name.
@@ -53,12 +51,12 @@ public sealed class DbScriptMap
     /// <summary>
     /// Gets the source for scripts in the collection.
     /// </summary>
-    public string Source => this.source;
+    public string Source { get; }
 
     /// <summary>
     /// Gets the version of the collection.
     /// </summary>
-    public Version Version => this.version;
+    public Version Version { get; }
 
     /// <summary>
     /// Gets the number of scripts in the collection.
@@ -70,11 +68,34 @@ public sealed class DbScriptMap
     /// </summary>
     /// <param name="fileName">A script file name.</param>
     /// <returns>A collection of SQL scripts.</returns>
-    public static DbScriptMap Load(string? fileName = null)
-    {
-        var loader = new Loader { FileName = fileName };
+    public static DbScriptMap Load(string? fileName = null) =>
+        LoadInternal(Assembly.GetCallingAssembly(), fileName, expectedVersion: null);
 
-        loader.Assembly = Assembly.GetCallingAssembly();
+    /// <summary>
+    /// Loads a collection of SQL scripts from an external source with a specified file name
+    /// and an expected minimal version.
+    /// </summary>
+    /// <param name="fileName">The script file name.</param>
+    /// <param name="expectedVersion">The script file expected minimal version.</param>
+    /// <returns>A collection of SQL scripts.</returns>
+    public static DbScriptMap Load(string fileName, Version expectedVersion) =>
+        LoadInternal(Assembly.GetCallingAssembly(), fileName, expectedVersion);
+
+    /// <summary>
+    /// Loads a collection of SQL scripts from an external source with an expected minimal version.
+    /// </summary>
+    /// <param name="expectedVersion">A script file expected minimal version.</param>
+    /// <returns>A collection of SQL scripts.</returns>
+    public static DbScriptMap Load(Version expectedVersion) =>
+        LoadInternal(Assembly.GetCallingAssembly(), fileName: null, expectedVersion);
+
+    private static DbScriptMap LoadInternal(Assembly callingAssembly, string? fileName, Version? expectedVersion)
+    {
+        var loader = new Loader
+        {
+            FileName = fileName,
+            Assembly = callingAssembly
+        };
         loader.TryLoadScripts();
 
         loader.Assembly = Assembly.GetEntryAssembly();
@@ -83,7 +104,12 @@ public sealed class DbScriptMap
         loader.Assembly = null;
         loader.TryLoadScripts();
 
-        return loader.GetScriptMap();
+        var scriptMap = loader.GetScriptMap();
+
+        if (expectedVersion is not null && scriptMap.Version < expectedVersion)
+            throw new ScriptMapVersionMismatchException();
+
+        return scriptMap;
     }
 
     /// <summary>
@@ -412,10 +438,10 @@ public sealed class DbScriptMap
                     {
                         if (commentRange.Equals(Range.All))
                             return -1;
-                        
+
                         offset += commentRange.End.GetOffset(span.Length) - 1;
                         span = span[commentRange.End..];
-                        
+
                         continue;
                     }
 
@@ -554,6 +580,40 @@ public sealed class DbScriptMap
             this.text = default;
             return false;
         }
+    }
+}
+
+/// <summary>
+/// Represents a version mismatch error between the expected and actual version of the script map.
+/// </summary>
+[Serializable]
+public class ScriptMapVersionMismatchException : Exception
+{
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ScriptMapVersionMismatchException"/> class.
+    /// </summary>
+    public ScriptMapVersionMismatchException()
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ScriptMapVersionMismatchException"/> class
+    /// with a specified error message.
+    /// </summary>
+    /// <param name="message">The error message that explains the reason for the exception.</param>
+    public ScriptMapVersionMismatchException(string? message) : base(message)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ScriptMapVersionMismatchException"/> class
+    /// with a specified error message and a reference to the inner exception that is the cause of this exception.
+    /// </summary>
+    /// <param name="message">The error message that explains the reason for the exception.</param>
+    /// <param name="innerException">The exception that is the cause of the current exception,
+    ///  or a <c>null</c> reference if no inner exception is specified.</param>
+    public ScriptMapVersionMismatchException(string? message, Exception? innerException) : base(message, innerException)
+    {
     }
 }
 

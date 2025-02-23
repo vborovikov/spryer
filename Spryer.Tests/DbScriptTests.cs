@@ -79,4 +79,11 @@ public class DbScriptTests
         var sql = DbScriptMap.Load("Wrong.sql");
         Assert.AreNotEqual("", sql["PragmaSpacesFullMeta"]);
     }
+
+    [TestMethod]
+    public void Load_VersionMismatch_ExceptionThrown()
+    {
+        Assert.ThrowsException<ScriptMapVersionMismatchException>(
+            () => DbScriptMap.Load("Wrong.sql", expectedVersion: new(3, 5)));
+    }
 }
