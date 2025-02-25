@@ -390,6 +390,7 @@ public sealed class DbScriptMap
     private readonly ref struct Pragma
     {
         public const string Marker = "--@";
+        public static readonly SearchValues<char> NewLineChars = SearchValues.Create("\r\n");
 
         public const string Script = "script";
         public const string Version = "version";
@@ -445,7 +446,7 @@ public sealed class DbScriptMap
                         continue;
                     }
 
-                    if (span[index - 1] is '\n' or '\r')
+                    if (NewLineChars.Contains(span[index - 1]))
                     {
                         break;
                     }
@@ -530,8 +531,6 @@ public sealed class DbScriptMap
 
     private ref struct PragmaEnumerator
     {
-        private static readonly SearchValues<char> NewLineChars = SearchValues.Create("\r\n");
-
         private ReadOnlySpan<char> text;
         private Pragma current;
 
@@ -554,7 +553,7 @@ public sealed class DbScriptMap
                     break;
 
                 remaining = remaining[(start + Pragma.Marker.Length)..];
-                var mid = remaining.IndexOfAny(NewLineChars);
+                var mid = remaining.IndexOfAny(Pragma.NewLineChars);
                 if (mid > 0)
                 {
                     var nr = Pragma.FindNameRange(remaining);
