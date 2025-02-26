@@ -26,6 +26,12 @@ public sealed class DbScriptMap
 
     private readonly FrozenScripts scripts;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DbScriptMap"/> class.
+    /// </summary>
+    /// <param name="source">The source for scripts in the collection.</param>
+    /// <param name="version">The version of the collection.</param>
+    /// <param name="scripts">The collection of scripts</param>
     private DbScriptMap(string source, Version version, FrozenScripts scripts)
     {
         this.Source = source;
@@ -42,14 +48,14 @@ public sealed class DbScriptMap
     /// Gets the SQL script with the specified name.
     /// </summary>
     /// <param name="name">A script name.</param>
-    /// <returns>A SQL script with the specified name.</returns>
+    /// <returns>A SQL script with the specified name or <c>string.Empty</c> if no such script is found.</returns>
     public string this[string name]
     {
         get => this.scripts.GetValueOrDefault(name, string.Empty);
     }
 
     /// <summary>
-    /// Gets the source for scripts in the collection.
+    /// Gets the sources for scripts in the collection separated by a new line.
     /// </summary>
     public string Source { get; }
 
@@ -629,18 +635,41 @@ static class Globbing
         if (names.Length < 2)
             return 0;
 
-        var i = 1;
-        var name = names[0].AsSpan();
-        var commonPrefixLength = name.Length;
+        var first = names[0].AsSpan();
+        var minLength = first.Length;
 
-        while (i < names.Length)
+        for (var i = 1; i != names.Length; ++i)
         {
-            commonPrefixLength = Math.Min(commonPrefixLength, name.CommonPrefixLength(names[i++]));
-            if (commonPrefixLength == 0)
-                return 0;
+            minLength = Math.Min(minLength, names[i].Length);
         }
 
-        return commonPrefixLength;
+        if (minLength == 0) return 0;
+
+        var commonLength = 0;
+        for (var i = 0; i != minLength; ++i)
+        {
+            var currentChar = first[i];
+            var allMatch = true;
+            for (var j = 1; j != names.Length; ++j)
+            {
+                if (names[j][i] != currentChar)
+                {
+                    allMatch = false;
+                    break;
+                }
+            }
+
+            if (allMatch)
+            {
+                commonLength++;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        return commonLength;
     }
 
     public static int IndexOfUnquoted(this ReadOnlySpan<char> span, char value, char quote, bool quoted = false)
@@ -648,7 +677,7 @@ static class Globbing
         var len = span.Length;
         if (len == 0) return -1;
 
-        ref char src = ref MemoryMarshal.GetReference(span);
+        ref var src = ref MemoryMarshal.GetReference(span);
         while (len > 0)
         {
             quoted ^= src == quote;
