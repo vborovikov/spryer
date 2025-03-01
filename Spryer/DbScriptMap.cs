@@ -379,7 +379,7 @@ public sealed class DbScriptMap
             var count = 0;
             foreach (var pragma in Pragma.Enumerate(text))
             {
-                if (pragma.IsScript && DbScript.TryParse(pragma, out var parsed))
+                if (DbScript.TryParse(pragma, out var parsed))
                 {
                     ref var script = ref CollectionsMarshal.GetValueRefOrAddDefault(this.scripts, parsed.Name, out _);
                     script = parsed;
@@ -401,8 +401,14 @@ public sealed class DbScriptMap
 
 record DbScript(string Name, string Text)
 {
-    internal static bool TryParse(in Pragma pragma, [NotNullWhen(true)] out DbScript script)
+    internal static bool TryParse(in Pragma pragma, [NotNullWhen(true)] out DbScript? script)
     {
+        if (!pragma.IsScript)
+        {
+            script = null;
+            return false;
+        }
+
         script = new(pragma.GetMetaName(), pragma.Data.ToString());
         return true;
     }
