@@ -12,8 +12,8 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
-using FrozenScripts = System.Collections.Frozen.FrozenDictionary<string, string>;
-using MutableScripts = System.Collections.Generic.Dictionary<string, string>;
+using FrozenScripts = System.Collections.Frozen.FrozenDictionary<string, DbScript>;
+using MutableScripts = System.Collections.Generic.Dictionary<string, DbScript>;
 
 /// <summary>
 /// Represents a collection of SQL scripts loaded from an external source.
@@ -51,7 +51,13 @@ public sealed class DbScriptMap
     /// <returns>A SQL script with the specified name or <c>string.Empty</c> if no such script is found.</returns>
     public string this[string name]
     {
-        get => this.scripts.GetValueOrDefault(name, string.Empty);
+        get
+        {
+            if (this.scripts.TryGetValue(name, out var script))
+                return script.Text;
+
+            return string.Empty;
+        }
     }
 
     /// <summary>
@@ -373,10 +379,10 @@ public sealed class DbScriptMap
             var count = 0;
             foreach (var pragma in Pragma.Enumerate(text))
             {
-                if (pragma.IsScript)
+                if (pragma.IsScript && DbScript.TryParse(pragma, out var parsed))
                 {
-                    ref var script = ref CollectionsMarshal.GetValueRefOrAddDefault(this.scripts, pragma.GetMetaName(), out _);
-                    script = pragma.Data.ToString();
+                    ref var script = ref CollectionsMarshal.GetValueRefOrAddDefault(this.scripts, parsed.Name, out _);
+                    script = parsed;
                     ++count;
                 }
                 else if (pragma.Name.Equals(Pragma.Version, StringComparison.OrdinalIgnoreCase))
@@ -391,208 +397,217 @@ public sealed class DbScriptMap
             return count;
         }
     }
+}
 
-    [DebuggerDisplay("@{Name,nq} {Meta,nq}")]
-    private readonly ref struct Pragma
+record DbScript(string Name, string Text)
+{
+    internal static bool TryParse(in Pragma pragma, [NotNullWhen(true)] out DbScript script)
     {
-        public const string Marker = "--@";
-        public static readonly SearchValues<char> NewLineChars = SearchValues.Create("\r\n");
+        script = new(pragma.GetMetaName(), pragma.Data.ToString());
+        return true;
+    }
+}
 
-        public const string Script = "script";
-        public const string Version = "version";
+[DebuggerDisplay("@{Name,nq} {Meta,nq}")]
+readonly ref struct Pragma
+{
+    public const string Marker = "--@";
+    public static readonly SearchValues<char> NewLineChars = SearchValues.Create("\r\n");
 
-        public Pragma(ReadOnlySpan<char> name, ReadOnlySpan<char> meta, ReadOnlySpan<char> data)
-        {
-            this.Name = name;
-            this.Meta = meta;
-            this.Data = data;
-        }
+    public const string Script = "script";
+    public const string Version = "version";
 
-        public ReadOnlySpan<char> Name { get; }
-        public ReadOnlySpan<char> Meta { get; }
-        public ReadOnlySpan<char> Data { get; }
-
-        public bool IsScript
-        {
-            get =>
-                this.Name.Equals("script", StringComparison.OrdinalIgnoreCase) ||
-                this.Name.StartsWith("query", StringComparison.OrdinalIgnoreCase) ||
-                this.Name.StartsWith("execute", StringComparison.OrdinalIgnoreCase);
-        }
-
-        public string GetMetaName()
-        {
-            var meta = this.Meta;
-
-            var end = meta.IndexOfUnquoted(' ', '"');
-            if (end > 0)
-                meta = meta[0] == '"' && end > 2 ? meta[1..(end - 1)] : meta[..end];
-
-            return meta.ToString();
-        }
-
-        public static PragmaEnumerator Enumerate(ReadOnlySpan<char> text) => new(text);
-
-        public static int FindMarkerIndex(ReadOnlySpan<char> text)
-        {
-            var offset = 0;
-            var index = -1;
-
-            var span = text;
-            while (span.Length > 0)
-            {
-                index = span.IndexOf(Marker, StringComparison.Ordinal);
-                if (index == 0)
-                    return offset;
-                if (index < 0)
-                    return -1;
-
-                if (index > 0)
-                {
-                    if (IndexInsideComments(index, span, out var commentRange))
-                    {
-                        if (commentRange.Equals(Range.All))
-                            return -1;
-
-                        offset += commentRange.End.GetOffset(span.Length) - 1;
-                        span = span[commentRange.End..];
-
-                        continue;
-                    }
-
-                    if (NewLineChars.Contains(span[index - 1]))
-                    {
-                        break;
-                    }
-
-                    offset += index;
-                    span = span[(index + 1)..];
-                }
-            }
-
-            return offset + index;
-        }
-
-        internal static Range FindNameRange(ReadOnlySpan<char> span)
-        {
-            var start = span.IndexOfAnyExcept(' ');
-            if (start >= 0)
-            {
-                var end = span[start..].IndexOf(' ');
-                if (end > 0)
-                {
-                    return start..(start + end);
-                }
-            }
-
-            return default;
-        }
-
-        private static bool IndexInsideComments(int index, ReadOnlySpan<char> span, out Range commentRange)
-        {
-            var start = span.IndexOf("/*", StringComparison.Ordinal);
-            if (start < 0 || start > index)
-            {
-                commentRange = default;
-                return false;
-            }
-
-            var offset = 0;
-            var comment = 0;
-            while (span.Length > 0)
-            {
-                var end = span.IndexOf('*');
-                if (end <= 0)
-                    break;
-
-                if (span[end - 1] == '/')
-                {
-                    // comment start
-                    ++comment;
-                    ++end;
-                }
-                else if (span.Length - end > 1 && span[end + 1] == '/')
-                {
-                    // comment end
-                    --comment;
-                    end += 2;
-                }
-                else
-                {
-                    ++end;
-                }
-
-                if (comment == 0)
-                {
-                    commentRange = start..(offset + end);
-                    return true;
-                }
-                else if (end == span.Length)
-                {
-                    break;
-                }
-                else
-                {
-                    offset += end - 1;
-                    span = span[end..];
-                }
-            }
-
-            commentRange = Range.All;
-            return true;
-        }
+    public Pragma(ReadOnlySpan<char> name, ReadOnlySpan<char> meta, ReadOnlySpan<char> data)
+    {
+        this.Name = name;
+        this.Meta = meta;
+        this.Data = data;
     }
 
-    private ref struct PragmaEnumerator
-    {
-        private ReadOnlySpan<char> text;
-        private Pragma current;
+    public ReadOnlySpan<char> Name { get; }
+    public ReadOnlySpan<char> Meta { get; }
+    public ReadOnlySpan<char> Data { get; }
 
-        public PragmaEnumerator(ReadOnlySpan<char> text)
+    public bool IsScript
+    {
+        get =>
+            this.Name.Equals("script", StringComparison.OrdinalIgnoreCase) ||
+            this.Name.StartsWith("query", StringComparison.OrdinalIgnoreCase) ||
+            this.Name.StartsWith("execute", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public string GetMetaName()
+    {
+        var meta = this.Meta;
+
+        var end = meta.IndexOfUnquoted(' ', '"');
+        if (end > 0)
+            meta = meta[0] == '"' && end > 2 ? meta[1..(end - 1)] : meta[..end];
+
+        return meta.ToString();
+    }
+
+    public static PragmaEnumerator Enumerate(ReadOnlySpan<char> text) => new(text);
+
+    public static int FindMarkerIndex(ReadOnlySpan<char> text)
+    {
+        var offset = 0;
+        var index = -1;
+
+        var span = text;
+        while (span.Length > 0)
         {
-            this.text = text;
+            index = span.IndexOf(Marker, StringComparison.Ordinal);
+            if (index == 0)
+                return offset;
+            if (index < 0)
+                return -1;
+
+            if (index > 0)
+            {
+                if (IndexInsideComments(index, span, out var commentRange))
+                {
+                    if (commentRange.Equals(Range.All))
+                        return -1;
+
+                    offset += commentRange.End.GetOffset(span.Length) - 1;
+                    span = span[commentRange.End..];
+
+                    continue;
+                }
+
+                if (NewLineChars.Contains(span[index - 1]))
+                {
+                    break;
+                }
+
+                offset += index;
+                span = span[(index + 1)..];
+            }
         }
 
-        public readonly Pragma Current => this.current;
+        return offset + index;
+    }
 
-        public readonly PragmaEnumerator GetEnumerator() => this;
-
-        public bool MoveNext()
+    internal static Range FindNameRange(ReadOnlySpan<char> span)
+    {
+        var start = span.IndexOfAnyExcept(' ');
+        if (start >= 0)
         {
-            var remaining = this.text;
-            while (remaining.Length > 0)
+            var end = span[start..].IndexOf(' ');
+            if (end > 0)
             {
-                var start = Pragma.FindMarkerIndex(remaining);
-                if (start < 0)
-                    break;
-
-                remaining = remaining[(start + Pragma.Marker.Length)..];
-                var mid = remaining.IndexOfAny(Pragma.NewLineChars);
-                if (mid > 0)
-                {
-                    var nr = Pragma.FindNameRange(remaining);
-                    if (!nr.Equals(default) && nr.End.GetOffset(remaining.Length) < mid)
-                    {
-                        var end = Pragma.FindMarkerIndex(remaining);
-                        if (end < 0)
-                        {
-                            end = remaining.Length;
-                        }
-
-                        var name = remaining[nr].Trim();
-                        var meta = remaining[nr.End..mid].Trim();
-                        var data = remaining[mid..end].Trim();
-                        this.current = new Pragma(name, meta, data);
-
-                        this.text = remaining[end..];
-                        return true;
-                    }
-                }
+                return start..(start + end);
             }
+        }
 
-            this.text = default;
+        return default;
+    }
+
+    private static bool IndexInsideComments(int index, ReadOnlySpan<char> span, out Range commentRange)
+    {
+        var start = span.IndexOf("/*", StringComparison.Ordinal);
+        if (start < 0 || start > index)
+        {
+            commentRange = default;
             return false;
         }
+
+        var offset = 0;
+        var comment = 0;
+        while (span.Length > 0)
+        {
+            var end = span.IndexOf('*');
+            if (end <= 0)
+                break;
+
+            if (span[end - 1] == '/')
+            {
+                // comment start
+                ++comment;
+                ++end;
+            }
+            else if (span.Length - end > 1 && span[end + 1] == '/')
+            {
+                // comment end
+                --comment;
+                end += 2;
+            }
+            else
+            {
+                ++end;
+            }
+
+            if (comment == 0)
+            {
+                commentRange = start..(offset + end);
+                return true;
+            }
+            else if (end == span.Length)
+            {
+                break;
+            }
+            else
+            {
+                offset += end - 1;
+                span = span[end..];
+            }
+        }
+
+        commentRange = Range.All;
+        return true;
+    }
+}
+
+ref struct PragmaEnumerator
+{
+    private ReadOnlySpan<char> text;
+    private Pragma current;
+
+    public PragmaEnumerator(ReadOnlySpan<char> text)
+    {
+        this.text = text;
+    }
+
+    public readonly Pragma Current => this.current;
+
+    public readonly PragmaEnumerator GetEnumerator() => this;
+
+    public bool MoveNext()
+    {
+        var remaining = this.text;
+        while (remaining.Length > 0)
+        {
+            var start = Pragma.FindMarkerIndex(remaining);
+            if (start < 0)
+                break;
+
+            remaining = remaining[(start + Pragma.Marker.Length)..];
+            var mid = remaining.IndexOfAny(Pragma.NewLineChars);
+            if (mid > 0)
+            {
+                var nr = Pragma.FindNameRange(remaining);
+                if (!nr.Equals(default) && nr.End.GetOffset(remaining.Length) < mid)
+                {
+                    var end = Pragma.FindMarkerIndex(remaining);
+                    if (end < 0)
+                    {
+                        end = remaining.Length;
+                    }
+
+                    var name = remaining[nr].Trim();
+                    var meta = remaining[nr.End..mid].Trim();
+                    var data = remaining[mid..end].Trim();
+                    this.current = new Pragma(name, meta, data);
+
+                    this.text = remaining[end..];
+                    return true;
+                }
+            }
+        }
+
+        this.text = default;
+        return false;
     }
 }
 
