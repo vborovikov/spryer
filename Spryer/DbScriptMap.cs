@@ -373,7 +373,7 @@ public sealed class DbScriptMap
             var count = 0;
             foreach (var pragma in Pragma.Enumerate(text))
             {
-                if (pragma.Name.Equals(Pragma.Script, StringComparison.OrdinalIgnoreCase))
+                if (pragma.IsScript)
                 {
                     ref var script = ref CollectionsMarshal.GetValueRefOrAddDefault(this.scripts, pragma.GetMetaName(), out _);
                     script = pragma.Data.ToString();
@@ -411,6 +411,14 @@ public sealed class DbScriptMap
         public ReadOnlySpan<char> Name { get; }
         public ReadOnlySpan<char> Meta { get; }
         public ReadOnlySpan<char> Data { get; }
+
+        public bool IsScript
+        {
+            get =>
+                this.Name.Equals("script", StringComparison.OrdinalIgnoreCase) ||
+                this.Name.StartsWith("query", StringComparison.OrdinalIgnoreCase) ||
+                this.Name.StartsWith("execute", StringComparison.OrdinalIgnoreCase);
+        }
 
         public string GetMetaName()
         {
