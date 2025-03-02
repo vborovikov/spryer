@@ -4,6 +4,7 @@ using System;
 using System.Buffers;
 using System.Collections.Frozen;
 using System.Collections.Generic;
+using System.Data;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
@@ -399,8 +400,22 @@ public sealed class DbScriptMap
     }
 }
 
+[DebuggerDisplay("@{Name,nq} {Type}({Size})")]
+record DbScriptParameter(string Name, DbType Type)
+{
+    public int Size { get; init; }
+
+    internal static bool TryParse(ReadOnlySpan<char> span, [NotNullWhen(true)] out DbScriptParameter? parameter)
+    {
+        parameter = null;
+        return false;
+    }
+}
+
 record DbScript(string Name, string Text)
 {
+    public DbScriptParameter[] Parameters { get; init; } = [];
+
     internal static bool TryParse(in Pragma pragma, [NotNullWhen(true)] out DbScript? script)
     {
         if (!pragma.IsScript)
@@ -409,8 +424,121 @@ record DbScript(string Name, string Text)
             return false;
         }
 
-        script = new(pragma.GetMetaName(), pragma.Data.ToString());
+        var scriptName = string.Empty;
+        var parameters = new List<DbScriptParameter>();
+        foreach (var token in MetaToken.Enumerate(pragma.Meta))
+        {
+            if (token.Type == MetaTokenType.Parameter && DbScriptParameter.TryParse(token.Span, out var parameter))
+            {
+                parameters.Add(parameter);
+            }
+            else if (token.Type == MetaTokenType.ScriptName)
+            {
+                scriptName = token.Span.ToString();
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(scriptName))
+        {
+            script = null;
+            return false;
+        }
+
+        script = new(scriptName, pragma.Data.ToString())
+        {
+            Parameters = parameters.ToArray()
+        };
         return true;
+    }
+
+    private enum MetaTokenType
+    {
+        Unknown,
+        ScriptName,
+        Parameter,
+    }
+
+    [DebuggerDisplay("{Type}: {Span}")]
+    private readonly ref struct MetaToken
+    {
+        public MetaToken(ReadOnlySpan<char> span, MetaTokenType type)
+        {
+            this.Span = span;
+            this.Type = type;
+        }
+
+        public ReadOnlySpan<char> Span { get; }
+        public MetaTokenType Type { get; }
+
+        public static MetaTokenEnumerator Enumerate(ReadOnlySpan<char> meta) => new(meta);
+    }
+
+    private ref struct MetaTokenEnumerator
+    {
+        private static readonly SearchValues<char> NameSeparators = SearchValues.Create(" (");
+        private static readonly SearchValues<char> ParamSeparators = SearchValues.Create(",)");
+
+        private ReadOnlySpan<char> meta;
+        private MetaTokenType type;
+        private MetaToken current;
+
+        public MetaTokenEnumerator(ReadOnlySpan<char> meta)
+        {
+            this.meta = meta;
+            this.type = MetaTokenType.Unknown;
+        }
+
+        public readonly MetaToken Current => this.current;
+
+        public readonly MetaTokenEnumerator GetEnumerator() => this;
+
+        public bool MoveNext()
+        {
+            var remaining = this.meta;
+            if (remaining.IsEmpty)
+                return false;
+
+            if (this.type < MetaTokenType.Parameter)
+            {
+                ++this.type;
+            }
+
+            if (this.type == MetaTokenType.ScriptName)
+            {
+                var span = remaining;
+                var end = remaining.IndexOfAnyUnquoted(NameSeparators, '"');
+                if (end > 0)
+                {
+                    span = remaining[0] == '"' && end > 2 ? remaining[1..(end - 1)] : remaining[..end];
+                    this.meta = remaining[end..].TrimStart();
+                }
+                else
+                {
+                    this.meta = default;
+                }
+
+                this.current = new(span, this.type);
+                return true;
+            }
+            else if (this.type == MetaTokenType.Parameter)
+            {
+                if (remaining[0] == '(')
+                    remaining = remaining[1..];
+
+                var end = remaining.IndexOfAny(ParamSeparators);
+                if (end > 0)
+                {
+                    var span = remaining[..end].Trim();
+
+                    this.current = new(span, this.type);
+                    this.meta = remaining[end..].TrimStart(',');
+                    return true;
+                }
+            }
+
+            this.meta = default;
+            return false;
+        }
     }
 }
 
@@ -701,16 +829,63 @@ static class Globbing
         return commonLength;
     }
 
-    public static int IndexOfUnquoted(this ReadOnlySpan<char> span, char value, char quote, bool quoted = false)
+    public static int IndexOfUnquoted(this ReadOnlySpan<char> span, char value, char quote)
     {
         var len = span.Length;
         if (len == 0) return -1;
 
+        var quoted = false;
         ref var src = ref MemoryMarshal.GetReference(span);
         while (len > 0)
         {
             quoted ^= src == quote;
             if (!quoted && src == value)
+            {
+                return span.Length - len;
+            }
+
+            src = ref Unsafe.Add(ref src, 1);
+            --len;
+        }
+
+        return -1;
+    }
+
+    public static int IndexOfAnyUnquoted(this ReadOnlySpan<char> span, SearchValues<char> values, char quote)
+    {
+        var len = span.Length;
+        if (len == 0) return -1;
+
+        var quoted = false;
+        ref var src = ref MemoryMarshal.GetReference(span);
+        while (len > 0)
+        {
+            quoted ^= src == quote;
+            if (!quoted && values.Contains(src))
+            {
+                return span.Length - len;
+            }
+
+            src = ref Unsafe.Add(ref src, 1);
+            --len;
+        }
+
+        return -1;
+    }
+
+    public static int IndexOfUnclosed(this ReadOnlySpan<char> span, char value, char opener, char closer)
+    {
+        var len = span.Length;
+        if (len == 0) return -1;
+
+        var enclosed = 0;
+        ref var src = ref MemoryMarshal.GetReference(span);
+        while (len > 0)
+        {
+            if (src == opener) ++enclosed;
+            if (src == closer) --enclosed;
+
+            if (enclosed == 0 && src == value)
             {
                 return span.Length - len;
             }
