@@ -77,7 +77,10 @@ public class DbScriptTests
     public void Load_SpaceBeforePragmaFullMeta_Parsed()
     {
         var sql = DbScriptMap.Load("Wrong.sql");
-        Assert.AreNotEqual("", sql["PragmaSpacesFullMeta"]);
+        var script = sql.Find("PragmaSpacesFullMeta");
+        Assert.IsNotNull(script);
+        Assert.AreNotEqual("", script.Text);
+        Assert.AreEqual(2, script.Parameters.Length);
     }
 
     [TestMethod]

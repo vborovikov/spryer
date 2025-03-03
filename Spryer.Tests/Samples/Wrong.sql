@@ -9,7 +9,7 @@ from aTable;
 
 */
 
---@ script  PragmaSpacesFullMeta  (@Param1, @Param2)
+--@ script  PragmaSpacesFullMeta  (@Param1 nvarchar(max), @Param2 varchar(10))
 select t.*
 from aTable t
 where t.Column1 = @Param1 and t.Column2 = @Param2;

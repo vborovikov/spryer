@@ -50,16 +50,14 @@ public sealed class DbScriptMap
     /// </summary>
     /// <param name="name">A script name.</param>
     /// <returns>A SQL script with the specified name or <c>string.Empty</c> if no such script is found.</returns>
-    public string this[string name]
-    {
-        get
-        {
-            if (this.scripts.TryGetValue(name, out var script))
-                return script.Text;
+    public string this[string name] => this.scripts.GetValueOrDefault(name, DbScript.Empty).Text;
 
-            return string.Empty;
-        }
-    }
+    /// <summary>
+    /// Finds the <see cref="DbScript"/> object with the specified name.
+    /// </summary>
+    /// <param name="name">A script name.</param>
+    /// <returns>A <see cref="DbScript"/> object with the specified name or <c>null</c> if no such script is found.</returns>
+    internal DbScript? Find(string name) => this.scripts.GetValueOrDefault(name);
 
     /// <summary>
     /// Gets the sources for scripts in the collection separated by a new line.
@@ -407,13 +405,85 @@ record DbScriptParameter(string Name, DbType Type)
 
     internal static bool TryParse(ReadOnlySpan<char> span, [NotNullWhen(true)] out DbScriptParameter? parameter)
     {
+        var name = span;
+        var type = DbType.String;
+        var size = -1;
+
+        var mid = span.IndexOf(' ');
+        if (mid > 0)
+        {
+            name = span[..mid];
+            var typeName = span[mid..].TrimStart();
+
+            var sep = typeName.IndexOf('(');
+            if (sep > 0)
+            {
+                var typeSize = typeName[(sep + 1)..].Trim().TrimEnd(')').Trim();
+                if (int.TryParse(typeSize, out var parsedSize))
+                {
+                    size = parsedSize;
+                }
+
+                typeName = typeName[..sep].TrimEnd();
+            }
+
+            if (typeName.Length > 0 && typeMap.TryGetValue(typeName.ToString(), out var foundType))
+            {
+                type = foundType;
+            }
+        }
+
+        if (name.Length > 1)
+        {
+            parameter = new(name.TrimStart('@').ToString(), type) { Size = size };
+            return true;
+        }
+
         parameter = null;
         return false;
     }
+
+    private static readonly FrozenDictionary<string, DbType> typeMap =
+        (new KeyValuePair<string, DbType>[]
+        {
+            new("bigint", DbType.Int64),
+            new("binary", DbType.Binary),
+            new("bit", DbType.Boolean),
+            new("char", DbType.AnsiStringFixedLength),
+            new("date", DbType.Date),
+            new("datetime", DbType.DateTime),
+            new("datetime2", DbType.DateTime2),
+            new("datetimeoffset", DbType.DateTimeOffset),
+            new("decimal", DbType.Decimal),
+            new("float", DbType.Double),
+            new("image", DbType.Binary),
+            new("int", DbType.Int32),
+            new("money", DbType.Currency),
+            new("nchar", DbType.StringFixedLength),
+            new("ntext", DbType.String),
+            new("numeric", DbType.Decimal),
+            new("nvarchar", DbType.String),
+            new("real", DbType.Single),
+            new("rowversion", DbType.Binary),
+            new("smalldatetime", DbType.DateTime),
+            new("smallint", DbType.Int16),
+            new("smallmoney", DbType.Currency),
+            new("sql_variant", DbType.Object),
+            new("text", DbType.AnsiString),
+            new("time", DbType.Time),
+            new("timestamp", DbType.Binary),
+            new("tinyint", DbType.Byte),
+            new("uniqueidentifier", DbType.Guid),
+            new("varbinary", DbType.Binary),
+            new("varchar", DbType.AnsiString),
+            new("xml", DbType.Xml),
+         }).ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 }
 
 record DbScript(string Name, string Text)
 {
+    public static readonly DbScript Empty = new(string.Empty, string.Empty);
+
     public DbScriptParameter[] Parameters { get; init; } = [];
 
     internal static bool TryParse(in Pragma pragma, [NotNullWhen(true)] out DbScript? script)
@@ -525,7 +595,7 @@ record DbScript(string Name, string Text)
                 if (remaining[0] == '(')
                     remaining = remaining[1..];
 
-                var end = remaining.IndexOfAny(ParamSeparators);
+                var end = remaining.IndexOfAnyUnclosed(ParamSeparators, '(', ')');
                 if (end > 0)
                 {
                     var span = remaining[..end].Trim();
@@ -882,10 +952,44 @@ static class Globbing
         ref var src = ref MemoryMarshal.GetReference(span);
         while (len > 0)
         {
-            if (src == opener) ++enclosed;
-            if (src == closer) --enclosed;
+            if (src == opener)
+            {
+                ++enclosed;
+            }
+            else if (src == closer && enclosed > 0)
+            {
+                --enclosed;
+            }
+            else if (enclosed == 0 && src == value)
+            {
+                return span.Length - len;
+            }
 
-            if (enclosed == 0 && src == value)
+            src = ref Unsafe.Add(ref src, 1);
+            --len;
+        }
+
+        return -1;
+    }
+
+    public static int IndexOfAnyUnclosed(this ReadOnlySpan<char> span, SearchValues<char> values, char opener, char closer)
+    {
+        var len = span.Length;
+        if (len == 0) return -1;
+
+        var enclosed = 0;
+        ref var src = ref MemoryMarshal.GetReference(span);
+        while (len > 0)
+        {
+            if (src == opener)
+            {
+                ++enclosed;
+            }
+            else if (src == closer && enclosed > 0)
+            {
+                --enclosed;
+            }
+            else if (enclosed == 0 && values.Contains(src))
             {
                 return span.Length - len;
             }
