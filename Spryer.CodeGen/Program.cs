@@ -1,4 +1,4 @@
-﻿namespace Spryer.Generator;
+﻿namespace Spryer.CodeGen;
 
 static class Program
 {
@@ -6,7 +6,7 @@ static class Program
     {
         if (args.Length < 1)
         {
-            Console.Error.WriteLine("Usage: SpryerGen <script_file_name>");
+            Console.Error.WriteLine("Usage: SpryerGen <script file path>");
             return 1;
         }
 
