@@ -89,4 +89,43 @@ public class DbScriptTests
         Assert.ThrowsException<ScriptMapVersionMismatchException>(
             () => DbScriptMap.Load("Wrong.sql", expectedVersion: new(3, 5)));
     }
+
+    [DataTestMethod]
+    [DataRow("--@script \"MyScript\"\rSELECT 1;", DbScriptType.Generic)]
+    [DataRow("--@execute \"MyExecute\"\rEXEC MyProc;", DbScriptType.Execute)]
+    [DataRow("--@execute-reader \"MyReader\"\rSELECT * FROM MyTable;", DbScriptType.ExecuteReader)]
+    [DataRow("--@execute-scalar \"MyScalar\"\rSELECT COUNT(*) FROM MyTable;", DbScriptType.ExecuteScalar)]
+    [DataRow("--@query \"MyQuery\"\rSELECT * FROM MyTable;", DbScriptType.Query)]
+    [DataRow("--@query-first \"MyFirst\"\rSELECT * FROM MyTable;", DbScriptType.QueryFirst)]
+    [DataRow("--@query-first-default \"MyFirstDefault\"\rSELECT * FROM MyTable;", DbScriptType.QueryFirstOrDefault)]
+    [DataRow("--@query-single \"MySingle\"\rSELECT * FROM MyTable;", DbScriptType.QuerySingle)]
+    [DataRow("--@query-single-default \"MySingleDefault\"\rSELECT * FROM MyTable;", DbScriptType.QuerySingleOrDefault)]
+    [DataRow("--@query-multiple \"MyMultiple\"\rSELECT * FROM MyTable;", DbScriptType.QueryMultiple)]
+    [DataRow("--@query-unbuffered \"MyUnbuffered\"\rSELECT * FROM MyTable;", DbScriptType.QueryUnbuffered)]
+    public void DbScript_TryParse_ValidPragma_SetsTypeCorrectly(string pragmaText, DbScriptType expectedType)
+    {
+        var pragma = CreatePragma(pragmaText);
+        var result = DbScript.TryParse(pragma, out var script);
+
+        Assert.IsTrue(result);
+        Assert.IsNotNull(script);
+        Assert.AreEqual(expectedType, script.Type);
+    }
+
+    [TestMethod]
+    public void DbScript_TryParse_InvalidPragma_ReturnsFalse()
+    {
+        var pragma = CreatePragma("--@invalid \"InvalidScript\"\nInvalid SQL;");
+        var result = DbScript.TryParse(pragma, out var script);
+
+        Assert.IsFalse(result);
+        Assert.IsNull(script);
+    }
+
+    private static Pragma CreatePragma(string pragmaText)
+    {
+        var pragmaEnumerator = Pragma.Enumerate(pragmaText);
+        Assert.IsTrue(pragmaEnumerator.MoveNext());
+        return pragmaEnumerator.Current;
+    }
 }

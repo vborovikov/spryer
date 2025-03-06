@@ -480,10 +480,62 @@ record DbScriptParameter(string Name, DbType Type)
          }).ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 }
 
+/// <summary>
+/// Represents a kind of Dapper extension method to use with the script.
+/// </summary>
+public enum DbScriptType
+{
+    /// <summary>
+    /// A generic script, any method.
+    /// </summary>
+    Generic,
+    /// <summary>
+    /// Execute() method.
+    /// </summary>
+    Execute,
+    /// <summary>
+    /// ExecuteReader() method.
+    /// </summary>
+    ExecuteReader,
+    /// <summary>
+    /// ExecuteScalar() method.
+    /// </summary>
+    ExecuteScalar,
+    /// <summary>
+    /// Query() method.
+    /// </summary>
+    Query,
+    /// <summary>
+    /// QueryFirst() method.
+    /// </summary>
+    QueryFirst,
+    /// <summary>
+    /// QueryFirstOrDefault() method.
+    /// </summary>
+    QueryFirstOrDefault,
+    /// <summary>
+    /// QuerySingle() method.
+    /// </summary>
+    QuerySingle,
+    /// <summary>
+    /// QuerySingleOrDefault() method.
+    /// </summary>
+    QuerySingleOrDefault,
+    /// <summary>
+    /// QueryMultiple() method.
+    /// </summary>
+    QueryMultiple,
+    /// <summary>
+    /// QueryUnbuffered() method.
+    /// </summary>
+    QueryUnbuffered,
+}
+
 record DbScript(string Name, string Text)
 {
     public static readonly DbScript Empty = new(string.Empty, string.Empty);
 
+    public DbScriptType Type { get; init; } = DbScriptType.Generic;
     public DbScriptParameter[] Parameters { get; init; } = [];
 
     internal static bool TryParse(in Pragma pragma, [NotNullWhen(true)] out DbScript? script)
@@ -516,6 +568,7 @@ record DbScript(string Name, string Text)
 
         script = new(scriptName, pragma.Data.ToString())
         {
+            Type = knownScriptTypes.GetValueOrDefault(pragma.Name.ToString()),
             Parameters = parameters.ToArray()
         };
         return true;
@@ -610,6 +663,22 @@ record DbScript(string Name, string Text)
             return false;
         }
     }
+
+    private static readonly FrozenDictionary<string, DbScriptType> knownScriptTypes = 
+        (new KeyValuePair<string, DbScriptType>[]
+        {
+            new("script", DbScriptType.Generic),
+            new("execute", DbScriptType.Execute),
+            new("execute-reader", DbScriptType.ExecuteReader),
+            new("execute-scalar", DbScriptType.ExecuteScalar),
+            new("query", DbScriptType.Query),
+            new("query-first", DbScriptType.QueryFirst),
+            new("query-first-default", DbScriptType.QueryFirstOrDefault),
+            new("query-single", DbScriptType.QuerySingle),
+            new("query-single-default", DbScriptType.QuerySingleOrDefault),
+            new("query-multiple", DbScriptType.QueryMultiple),
+            new("query-unbuffered", DbScriptType.QueryUnbuffered),
+        }).ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 }
 
 [DebuggerDisplay("@{Name,nq} {Meta,nq}")]
