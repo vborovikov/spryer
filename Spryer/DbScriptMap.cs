@@ -74,6 +74,8 @@ public sealed class DbScriptMap
     /// </summary>
     public int Count => this.scripts.Count;
 
+    internal IEnumerable<DbScript> Enumerate() => this.scripts.Values;
+
     /// <summary>
     /// Loads a collection of SQL scripts from an external source.
     /// </summary>
