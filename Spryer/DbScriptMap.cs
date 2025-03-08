@@ -570,10 +570,23 @@ record DbScript(string Name, string Text)
 
         script = new(scriptName, pragma.Data.ToString())
         {
-            Type = knownScriptTypes.GetValueOrDefault(pragma.Name.ToString()),
+            Type = DetectScriptType(pragma),
             Parameters = parameters.ToArray()
         };
         return true;
+    }
+
+    private static DbScriptType DetectScriptType(in Pragma pragma)
+    {
+        var scriptType = knownScriptTypes.GetValueOrDefault(pragma.Name.ToString());
+        if (scriptType == DbScriptType.Generic)
+        {
+            scriptType = pragma.Data.StartsWith("select ", StringComparison.OrdinalIgnoreCase) ||
+                pragma.Data.StartsWith("with ", StringComparison.OrdinalIgnoreCase) ?
+                DbScriptType.Query : DbScriptType.Execute;
+        }
+
+        return scriptType;
     }
 
     private enum MetaTokenType
@@ -666,7 +679,7 @@ record DbScript(string Name, string Text)
         }
     }
 
-    private static readonly FrozenDictionary<string, DbScriptType> knownScriptTypes = 
+    private static readonly FrozenDictionary<string, DbScriptType> knownScriptTypes =
         (new KeyValuePair<string, DbScriptType>[]
         {
             new("script", DbScriptType.Generic),
