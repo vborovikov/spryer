@@ -3,6 +3,7 @@
 using System;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 
 sealed class ScriptClass : ICodeGenerator
 {
@@ -38,7 +39,7 @@ sealed class ScriptClass : ICodeGenerator
 
     private void GenerateClass(CodeBuilder code)
     {
-        code.AppendLine($"internal static class {GetClassName()}");
+        code.AppendLine($"internal static partial class {GetClassName()}");
         code.AppendLine("{");
 
         using (code.Indent())
@@ -115,8 +116,28 @@ sealed class ScriptClass : ICodeGenerator
 
         if (string.IsNullOrWhiteSpace(ns))
         {
-            //todo: construct the namespace from the script map source directory structure (walk up the tree until a *.csproj file is found)
-            ns = "Generated";
+            var nsBuilder = new StringBuilder();
+
+            for (var dir = Directory.GetParent(this.scriptMap.Source); dir is not null; dir = dir.Parent)
+            {
+                var csproj = dir.EnumerateFiles("*.csproj").FirstOrDefault();
+                if (csproj is not null)
+                {
+                    var projectName = Path.GetFileNameWithoutExtension(csproj.Name);
+                    if (nsBuilder.Length > 0) nsBuilder.Insert(0, '.');
+                    nsBuilder.Insert(0, projectName);
+                    break;
+                }
+
+                if (nsBuilder.Length > 0) nsBuilder.Insert(0, '.');
+                nsBuilder.Insert(0, dir.Name);
+            }
+            if (nsBuilder.Length == 0)
+            {
+                nsBuilder.Append("Spryer.Generated");
+            }
+
+            ns = nsBuilder.ToString();
         }
 
         return ns;
