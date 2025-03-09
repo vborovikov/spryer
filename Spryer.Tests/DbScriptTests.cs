@@ -91,7 +91,7 @@ public class DbScriptTests
     }
 
     [DataTestMethod]
-    [DataRow("--@script \"MyScript\"\rSELECT 1;", DbScriptType.Generic)]
+    [DataRow("--@script \"MyScript\"\rSELECT 1;", DbScriptType.Query)]
     [DataRow("--@execute \"MyExecute\"\rEXEC MyProc;", DbScriptType.Execute)]
     [DataRow("--@execute-reader \"MyReader\"\rSELECT * FROM MyTable;", DbScriptType.ExecuteReader)]
     [DataRow("--@execute-scalar \"MyScalar\"\rSELECT COUNT(*) FROM MyTable;", DbScriptType.ExecuteScalar)]

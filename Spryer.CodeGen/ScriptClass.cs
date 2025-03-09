@@ -82,8 +82,9 @@ sealed class ScriptClass : ICodeGenerator
 
     private void GenerateUsings(CodeBuilder code)
     {
-        var usings = this.Usings.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Concat(DefaultUsings.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        var usings = DefaultUsings.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Concat(this.Usings.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            .Concat(this.scriptMap.Pragmas["using"])
             //.Order(StringComparer.Ordinal)
             .Distinct(StringComparer.Ordinal);
 

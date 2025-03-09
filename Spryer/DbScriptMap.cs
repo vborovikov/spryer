@@ -76,6 +76,9 @@ public sealed class DbScriptMap
 
     internal IEnumerable<DbScript> Enumerate() => this.scripts.Values;
 
+    internal ILookup<string, string> Pragmas { get; init; } =
+        Array.Empty<CustomPragma>().ToLookup(p => p.Name, p => p.Meta, StringComparer.OrdinalIgnoreCase);
+
     /// <summary>
     /// Loads a collection of SQL scripts from an external source.
     /// </summary>
@@ -125,13 +128,20 @@ public sealed class DbScriptMap
         return scriptMap;
     }
 
+    internal sealed record CustomPragma(string Name, string Meta)
+    {
+        public CustomPragma(in Pragma pragma)
+            : this(pragma.Name.ToString(), pragma.Meta.ToString()) { }
+    }
+
     /// <summary>
     /// Represents a loader for the script collection.
     /// </summary>
     public class Loader
     {
-        private readonly MutableScripts scripts;
         private readonly StringBuilder source;
+        private readonly MutableScripts scripts;
+        private readonly List<CustomPragma> pragmas;
         private Version version;
 
         /// <summary>
@@ -139,8 +149,9 @@ public sealed class DbScriptMap
         /// </summary>
         public Loader()
         {
-            this.scripts = new(StringComparer.OrdinalIgnoreCase);
             this.source = new();
+            this.scripts = new(StringComparer.OrdinalIgnoreCase);
+            this.pragmas = [];
             this.version = Empty.Version;
         }
 
@@ -161,7 +172,10 @@ public sealed class DbScriptMap
         {
             if (this.scripts.Count > 0)
             {
-                return new(this.source.ToString(), this.version, this.scripts.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase));
+                return new(this.source.ToString(), this.version, this.scripts.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase))
+                {
+                    Pragmas = this.pragmas.ToLookup(p => p.Name, p => p.Meta, StringComparer.OrdinalIgnoreCase)
+                };
             }
 
             return Empty;
@@ -392,6 +406,10 @@ public sealed class DbScriptMap
                     {
                         this.version = foundVersion;
                     }
+                }
+                else
+                {
+                    this.pragmas.Add(new(pragma));
                 }
             }
 
