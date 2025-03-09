@@ -786,7 +786,7 @@ readonly ref struct Pragma
         var span = text;
         while (span.Length > 0)
         {
-            index = span.IndexOf(Marker, StringComparison.Ordinal);
+            index = IndexOfMarker(span, out isMultiline);
             if (index == 0)
                 return offset;
             if (index < 0)
@@ -794,7 +794,7 @@ readonly ref struct Pragma
 
             if (index > 0)
             {
-                if (IndexInsideComments(index, span, out var commentRange))
+                if (IndexIsCommentedOut(index, span, out var commentRange))
                 {
                     if (commentRange.Equals(Range.All))
                         return -1;
@@ -833,11 +833,43 @@ readonly ref struct Pragma
         return default;
     }
 
-    private static bool IndexInsideComments(int index, ReadOnlySpan<char> span, out Range commentRange)
+    private static int IndexOfMarker(ReadOnlySpan<char> span, out bool altMarker)
+    {
+        var offset = 0;
+
+        while (span.Length > 0)
+        {
+            var index = span.IndexOf('@') - Marker.Length + 1;
+            if (index < 0) break;
+
+            span = span[index..];
+            offset += index;
+
+            if (span.StartsWith(Marker, StringComparison.Ordinal))
+            {
+                altMarker = false;
+                return offset;
+            }
+            else if (span.StartsWith(AltMarker, StringComparison.Ordinal))
+            {
+                altMarker = true;
+                return offset;
+            }
+
+            span = span[Marker.Length..];
+            offset += Marker.Length;
+        }
+
+        altMarker = default;
+        return -1;
+    }
+
+    private static bool IndexIsCommentedOut(int index, ReadOnlySpan<char> span, out Range commentRange)
     {
         var start = span.IndexOf("/*", StringComparison.Ordinal);
-        if (start < 0 || start > index)
+        if (start < 0 || start >= index)
         {
+            // equality to index means alt marker, nested comments are not allowed anyway
             commentRange = default;
             return false;
         }
@@ -1123,18 +1155,5 @@ static class Globbing
         }
 
         return -1;
-    }
-
-    public static int IndexAfter(this ReadOnlySpan<char> span, ReadOnlySpan<char> value)
-    {
-        var index = span.IndexOf(value, StringComparison.Ordinal);
-        if (index < 0)
-            return -1;
-
-        index += value.Length;
-        if (index >= span.Length)
-            return -1;
-
-        return index;
     }
 }

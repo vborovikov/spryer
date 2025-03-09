@@ -33,6 +33,7 @@ public class DbScriptTests
         var script = sql.Find("Multiline");
 
         Assert.IsNotNull(script);
+        Assert.AreEqual(DbScriptType.ExecuteScalar, script.Type);
         Assert.AreEqual("select 1;", script.Text);
         Assert.AreEqual(10, script.Parameters.Length);
     }
