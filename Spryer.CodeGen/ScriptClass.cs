@@ -59,12 +59,13 @@ sealed class ScriptClass : ICodeGenerator
 
     public string GetClassName()
     {
-        if (string.IsNullOrWhiteSpace(this.Name))
+        var className = this.Name ?? this.scriptMap.Pragmas["class"].FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(className))
         {
-            return Path.GetFileName(this.scriptMap.Source).ToPascalCase() + "Extensions";
+            className = Path.GetFileName(this.scriptMap.Source) + "Extensions";
         }
 
-        return this.Name.ToPascalCase();
+        return className.ToPascalCase();
     }
 
     private void GenerateCtor(CodeBuilder code)
@@ -113,7 +114,7 @@ sealed class ScriptClass : ICodeGenerator
 
     private string GetNamespace()
     {
-        var ns = this.Namespace;
+        var ns = this.Namespace ?? this.scriptMap.Pragmas["namespace"].FirstOrDefault();
 
         if (string.IsNullOrWhiteSpace(ns))
         {
