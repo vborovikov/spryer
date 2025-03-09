@@ -405,10 +405,13 @@ record DbScriptParameter(string Name, DbType Type)
 {
     public int Size { get; init; }
 
+    public string? CustomType { get; init; }
+
     internal static bool TryParse(ReadOnlySpan<char> span, [NotNullWhen(true)] out DbScriptParameter? parameter)
     {
         var name = span;
         var type = DbType.String;
+        var customType = default(string);
         var size = -1;
 
         var mid = span.IndexOf(' ');
@@ -429,15 +432,27 @@ record DbScriptParameter(string Name, DbType Type)
                 typeName = typeName[..sep].TrimEnd();
             }
 
-            if (typeName.Length > 0 && typeMap.TryGetValue(typeName.ToString(), out var foundType))
+            if (typeName.Length > 0)
             {
-                type = foundType;
+                if (typeMap.TryGetValue(typeName.ToString(), out var foundType))
+                {
+                    type = foundType;
+                }
+                else
+                {
+                    type = DbType.Object;
+                    customType = typeName.ToString();
+                }
             }
         }
 
         if (name.Length > 1)
         {
-            parameter = new(name.TrimStart('@').ToString(), type) { Size = size };
+            parameter = new(name.TrimStart('@').ToString(), type)
+            {
+                Size = size,
+                CustomType = customType,
+            };
             return true;
         }
 
