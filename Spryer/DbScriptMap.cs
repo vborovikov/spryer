@@ -388,7 +388,7 @@ public sealed class DbScriptMap
         private int ParseScripts(ReadOnlySpan<char> text)
         {
             // any sql statements before the first pragma are ignored
-            var start = Pragma.FindMarkerIndex(text);
+            var start = Pragma.FindMarkerIndex(text, out _);
             if (start < 0)
             {
                 return 0;
@@ -738,6 +738,8 @@ record DbScript(string Name, string Text)
 readonly ref struct Pragma
 {
     public const string Marker = "--@";
+    public const string AltMarker = "/*@";
+    public const string AltMarkerEnd = "@*/";
     public static readonly SearchValues<char> NewLineChars = SearchValues.Create("\r\n");
 
     public const string Script = "script";
@@ -775,8 +777,9 @@ readonly ref struct Pragma
 
     public static PragmaEnumerator Enumerate(ReadOnlySpan<char> text) => new(text);
 
-    public static int FindMarkerIndex(ReadOnlySpan<char> text)
+    public static int FindMarkerIndex(ReadOnlySpan<char> text, out bool isMultiline)
     {
+        isMultiline = false;
         var offset = 0;
         var index = -1;
 
@@ -904,26 +907,25 @@ ref struct PragmaEnumerator
         var remaining = this.text;
         while (remaining.Length > 0)
         {
-            var start = Pragma.FindMarkerIndex(remaining);
+            var start = Pragma.FindMarkerIndex(remaining, out var alt);
             if (start < 0)
                 break;
 
-            remaining = remaining[(start + Pragma.Marker.Length)..];
-            var mid = remaining.IndexOfAny(Pragma.NewLineChars);
+            remaining = remaining[(start + (alt ? Pragma.AltMarker.Length : Pragma.Marker.Length))..];
+            var mid = alt ? remaining.IndexOf(Pragma.AltMarkerEnd, StringComparison.Ordinal) : remaining.IndexOfAny(Pragma.NewLineChars);
             if (mid > 0)
             {
                 var nr = Pragma.FindNameRange(remaining);
                 if (!nr.Equals(default) && nr.End.GetOffset(remaining.Length) < mid)
                 {
-                    var end = Pragma.FindMarkerIndex(remaining);
-                    if (end < 0)
-                    {
-                        end = remaining.Length;
-                    }
+                    var mr = nr.End..mid;
+                    var end = Pragma.FindMarkerIndex(remaining, out _);
+                    if (end < 0) end = remaining.Length;
+                    var dr = alt ? (mid + Pragma.AltMarkerEnd.Length)..end : mid..end;
 
                     var name = remaining[nr].Trim();
-                    var meta = remaining[nr.End..mid].Trim();
-                    var data = remaining[mid..end].Trim();
+                    var meta = remaining[mr].Trim();
+                    var data = remaining[dr].Trim();
                     this.current = new Pragma(name, meta, data);
 
                     this.text = remaining[end..];
@@ -1121,5 +1123,18 @@ static class Globbing
         }
 
         return -1;
+    }
+
+    public static int IndexAfter(this ReadOnlySpan<char> span, ReadOnlySpan<char> value)
+    {
+        var index = span.IndexOf(value, StringComparison.Ordinal);
+        if (index < 0)
+            return -1;
+
+        index += value.Length;
+        if (index >= span.Length)
+            return -1;
+
+        return index;
     }
 }
