@@ -30,23 +30,21 @@ public sealed class DbScriptMap
     /// <summary>
     /// Initializes a new instance of the <see cref="DbScriptMap"/> class.
     /// </summary>
+    /// <param name="scripts">The collection of scripts</param>
     /// <param name="source">The source for scripts in the collection.</param>
     /// <param name="version">The version of the collection.</param>
-    /// <param name="scripts">The collection of scripts</param>
-    private DbScriptMap(string source, Version version, FrozenScripts scripts)
+    private DbScriptMap(FrozenScripts scripts, string source, Version version)
     {
+        this.scripts = scripts;
         this.Source = source;
         this.Version = version;
-        this.scripts = scripts;
+        this.Pragmas = Array.Empty<CustomPragma>().ToLookup(p => p.Name, p => p.Meta, StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>
     /// An empty instance of <see cref="DbScriptMap"/>.
     /// </summary>
-    public static readonly DbScriptMap Empty = new(string.Empty, new(), FrozenScripts.Empty)
-    {
-        Pragmas = Array.Empty<CustomPragma>().ToLookup(p => p.Name, p => p.Meta, StringComparer.OrdinalIgnoreCase)
-    };
+    public static readonly DbScriptMap Empty = new(FrozenScripts.Empty, string.Empty, new());
 
     /// <summary>
     /// Gets the SQL script with the specified name.
@@ -179,7 +177,7 @@ public sealed class DbScriptMap
         {
             if (this.scripts.Count > 0)
             {
-                return new(this.source.ToString(), this.version, this.scripts.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase))
+                return new(this.scripts.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase), this.source.ToString(), this.version)
                 {
                     Pragmas = this.CollectsPragmas ? this.pragmas.ToLookup(p => p.Name, p => p.Meta, StringComparer.OrdinalIgnoreCase) : Empty.Pragmas
                 };
