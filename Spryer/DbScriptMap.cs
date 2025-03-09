@@ -43,7 +43,10 @@ public sealed class DbScriptMap
     /// <summary>
     /// An empty instance of <see cref="DbScriptMap"/>.
     /// </summary>
-    public static readonly DbScriptMap Empty = new(string.Empty, new(), FrozenScripts.Empty);
+    public static readonly DbScriptMap Empty = new(string.Empty, new(), FrozenScripts.Empty)
+    {
+        Pragmas = Array.Empty<CustomPragma>().ToLookup(p => p.Name, p => p.Meta, StringComparer.OrdinalIgnoreCase)
+    };
 
     /// <summary>
     /// Gets the SQL script with the specified name.
@@ -76,8 +79,7 @@ public sealed class DbScriptMap
 
     internal IEnumerable<DbScript> Enumerate() => this.scripts.Values;
 
-    internal ILookup<string, string> Pragmas { get; init; } =
-        Array.Empty<CustomPragma>().ToLookup(p => p.Name, p => p.Meta, StringComparer.OrdinalIgnoreCase);
+    internal ILookup<string, string> Pragmas { get; init; }
 
     /// <summary>
     /// Loads a collection of SQL scripts from an external source.
@@ -156,7 +158,7 @@ public sealed class DbScriptMap
         }
 
         /// <summary>
-        /// Gets or sets the desired file name fro the script collection.
+        /// Gets or sets the desired file name for the script collection.
         /// </summary>
         public string? FileName { get; init; }
 
@@ -164,6 +166,11 @@ public sealed class DbScriptMap
         /// Gets or sets the assembly to look for the script collection.
         /// </summary>
         public Assembly? Assembly { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the loader should collect custom pragmas.
+        /// </summary>
+        internal bool CollectsPragmas { get; init; }
 
         /// <summary>
         /// Gets the loaded script collection.
@@ -174,7 +181,7 @@ public sealed class DbScriptMap
             {
                 return new(this.source.ToString(), this.version, this.scripts.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase))
                 {
-                    Pragmas = this.pragmas.ToLookup(p => p.Name, p => p.Meta, StringComparer.OrdinalIgnoreCase)
+                    Pragmas = this.CollectsPragmas ? this.pragmas.ToLookup(p => p.Name, p => p.Meta, StringComparer.OrdinalIgnoreCase) : Empty.Pragmas
                 };
             }
 

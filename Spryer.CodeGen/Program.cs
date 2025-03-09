@@ -15,7 +15,8 @@ static class Program
             var scriptFilePath = Path.GetFullPath(args[0]);
             var scriptMapLoader = new DbScriptMap.Loader
             {
-                FileName = scriptFilePath
+                FileName = scriptFilePath,
+                CollectsPragmas = true,
             };
             if (!scriptMapLoader.TryLoadScripts())
             {
