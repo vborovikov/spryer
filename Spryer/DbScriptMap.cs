@@ -569,6 +569,14 @@ public enum DbScriptType
     /// QueryUnbuffered() method.
     /// </summary>
     QueryUnbuffered,
+    /// <summary>
+    /// QueryText() method (Spryer).
+    /// </summary>
+    QueryText,
+    /// <summary>
+    /// QueryJson() method (Spryer).
+    /// </summary>
+    QueryJson,
 }
 
 record DbScript(string Name, string Text)
@@ -731,6 +739,8 @@ record DbScript(string Name, string Text)
             new("query-single-default", DbScriptType.QuerySingleOrDefault),
             new("query-multiple", DbScriptType.QueryMultiple),
             new("query-unbuffered", DbScriptType.QueryUnbuffered),
+            new("query-text", DbScriptType.QueryText),
+            new("query-json", DbScriptType.QueryJson),
         }).ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 }
 

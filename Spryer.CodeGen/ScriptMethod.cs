@@ -165,6 +165,8 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
             DbScriptType.QuerySingleOrDefault => nameof(SqlMapper.QuerySingleOrDefaultAsync),
             DbScriptType.QueryMultiple => nameof(SqlMapper.QueryMultipleAsync),
             DbScriptType.QueryUnbuffered => nameof(SqlMapper.QueryUnbufferedAsync),
+            DbScriptType.QueryText => "QueryTextAsync",
+            DbScriptType.QueryJson => "QueryJsonAsync",
             _ => nameof(SqlMapper.ExecuteAsync)
         } + GetDapperMethodGenericType();
     }
@@ -183,6 +185,8 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
             DbScriptType.QuerySingleOrDefault => "Task<T?>",
             DbScriptType.QueryMultiple => "Task<SqlMapper.GridReader>",
             DbScriptType.QueryUnbuffered => "IAsyncEnumerable<T>",
+            DbScriptType.QueryText => "Task<string>",
+            DbScriptType.QueryJson => "Task<T?>",
             _ => "Task<int>"
         };
     }
@@ -201,6 +205,8 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
             DbScriptType.QuerySingleOrDefault => "<T>",
             DbScriptType.QueryMultiple => string.Empty,
             DbScriptType.QueryUnbuffered => "<T>",
+            DbScriptType.QueryText => string.Empty,
+            DbScriptType.QueryJson => "<T>",
             _ => string.Empty
         };
     }

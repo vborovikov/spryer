@@ -93,7 +93,7 @@ public static class DapperExtensions
     /// <param name="throwOnMaxLength">Whether to throw an exception if the maximum length is exceeded.</param>
     /// <returns>A <see cref="DbString"/> instance with the specified properties.</returns>
     public static DbString AsDbString(this string? str, int maxLength = -1,
-        bool isFixedLength = false, bool isAnsi = false, bool throwOnMaxLength = false) => 
+        bool isFixedLength = false, bool isAnsi = false, bool throwOnMaxLength = false) =>
         new()
         {
             Value = maxLength > 0 && str?.Length > maxLength ?
