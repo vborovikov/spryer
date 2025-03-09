@@ -98,7 +98,7 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
 
     private string GetParameters()
     {
-        return string.Join(", ", this.Script.Parameters.Select(p => $"{GetParamType(p.Type)} {p.Name.ToCamelCase()}"));
+        return string.Join(", ", this.Script.Parameters.Select(p => $"{GetParamType(p)} {p.Name.ToCamelCase()}"));
     }
 
     private static string GetParamValue(DbScriptParameter p)
@@ -117,9 +117,9 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
         return paramName;
     }
 
-    private static string GetParamType(DbType type)
+    private static string GetParamType(DbScriptParameter p)
     {
-        return type switch
+        return p.Type switch
         {
             DbType.Boolean => "bool",
             DbType.Byte => "byte",
@@ -147,7 +147,7 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
             DbType.DateTimeOffset => "DateTimeOffset",
             DbType.Binary => "byte[]",
             DbType.Guid => "Guid",
-            _ => "object"
+            _ => string.IsNullOrWhiteSpace(p.CustomType) ? "object" : p.CustomType
         };
     }
 
