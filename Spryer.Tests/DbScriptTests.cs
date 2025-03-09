@@ -27,6 +27,17 @@ public class DbScriptTests
     }
 
     [TestMethod]
+    public void Load_MultilinePragma_Parsed()
+    {
+        var sql = DbScriptMap.Load();
+        var script = sql.Find("Multiline");
+
+        Assert.IsNotNull(script);
+        Assert.AreEqual("select 1;", script.Text);
+        Assert.AreEqual(10, script.Parameters.Length);
+    }
+
+    [TestMethod]
     public void Load_Wildcard_Loaded()
     {
         var sql = DbScriptMap.Load("Test?.sql");
