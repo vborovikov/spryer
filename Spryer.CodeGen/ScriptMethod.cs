@@ -14,6 +14,8 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
     {
         var methodName = this.Script.Name.ToPascalCase();
 
+        //todo: generate xml comments
+
         // method signature
         code.Append($"public static {GetDapperMethodReturnType()} {methodName}Async{GetDapperMethodGenericType()}(this IDbConnection {Cnn}");
         var parameters = GetParameters();
@@ -35,6 +37,8 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
             code.Append($"return {Cnn}.{GetDapperMethod()}(sql[\"{this.Script.Name}\"]");
             if (!string.IsNullOrWhiteSpace(arguments))
             {
+                //todo: check for (@Parameters object) special case
+
                 code.Append(',')
                     .AppendLine()
                     .IncrementIndent()
@@ -52,6 +56,8 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
 
         if (this.Script.Type is DbScriptType.Execute or DbScriptType.ExecuteReader or DbScriptType.ExecuteScalar)
         {
+            //todo: implement through calling the non-transactional method
+
             // method signature
             code.AppendLine()
                 .Append($"public static {GetDapperMethodReturnType()} {methodName}Async{GetDapperMethodGenericType()}(this IDbTransaction {Tx}");
