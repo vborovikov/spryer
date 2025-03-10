@@ -1,0 +1,29 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <Title>Spryer.Scripting</Title>
+    <Description>Standalone DbScriptMap code generator</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Spryer\DbScriptMap.cs" Link="DbScriptMap.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="IndexRange" Version="1.0.3" />
+    <PackageReference Include="System.Collections" Version="4.3.0" />
+    <PackageReference Include="System.Collections.Immutable" Version="9.0.2" />
+    <PackageReference Include="System.Runtime" Version="4.3.1" />
+    <PackageReference Include="System.Runtime.InteropServices" Version="4.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Spryer.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+</Project>

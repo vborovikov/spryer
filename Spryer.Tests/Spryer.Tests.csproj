@@ -21,6 +21,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Spryer\Spryer.csproj" />
+    <ProjectReference Include="..\Spryer.Scripting\Spryer.Scripting.csproj">
+      <Aliases>Standalone</Aliases>
+    </ProjectReference>
   </ItemGroup>
 
 </Project>

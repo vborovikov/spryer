@@ -1,4 +1,8 @@
-﻿namespace Spryer;
+﻿#if NET6_0_OR_GREATER
+namespace Spryer;
+#else
+namespace Spryer.Scripting;
+#endif
 
 using System;
 using System.Buffers;
@@ -9,6 +13,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.IO.Enumeration;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -266,7 +271,7 @@ public sealed class DbScriptMap
 
             if (!string.IsNullOrWhiteSpace(scriptText))
             {
-                var scriptCount = ParseScripts(scriptText);
+                var scriptCount = ParseScripts(scriptText.AsSpan());
                 Debug.WriteLine($"Spryer: {scriptCount} scripts found in '{scriptSource}'");
                 if (scriptCount > 0)
                 {
@@ -287,7 +292,7 @@ public sealed class DbScriptMap
         /// <returns>A script raw text.</returns>
         protected virtual string? GetScriptText(Stream scriptStream)
         {
-            using var reader = new StreamReader(scriptStream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: false);
+            using var reader = new StreamReader(scriptStream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, bufferSize: -1, leaveOpen: false);
             return reader.ReadToEnd();
         }
 
@@ -312,6 +317,7 @@ public sealed class DbScriptMap
                         yield return foundFileName;
                 }
             }
+#if NET6_0_OR_GREATER
             else
             {
                 // local app data: %AppData%\Local\<Process>\
@@ -332,6 +338,7 @@ public sealed class DbScriptMap
                         yield return foundFileName;
                 }
             }
+#endif
         }
 
         private IEnumerable<string> EnumerateFilePaths(string scriptFileName)
@@ -347,6 +354,7 @@ public sealed class DbScriptMap
                     Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), this.Assembly.GetName().Name!),
                     scriptFileName);
             }
+#if NET6_0_OR_GREATER
             else
             {
                 // process directory
@@ -361,6 +369,7 @@ public sealed class DbScriptMap
                         scriptFileName);
                 }
             }
+#endif
         }
 
         private IEnumerable<string?> EnumerateFileNames()
@@ -371,8 +380,10 @@ public sealed class DbScriptMap
             }
             else
             {
+#if NET6_0_OR_GREATER
                 yield return Path.ChangeExtension(Path.GetFileName(Environment.ProcessPath), ScriptsFileExt);
                 yield return Path.GetFileNameWithoutExtension(Environment.ProcessPath) + "." + ScriptsFileName + ScriptsFileExt;
+#endif
 
                 if (this.Assembly is not null)
                 {
@@ -401,13 +412,24 @@ public sealed class DbScriptMap
             {
                 if (DbScript.TryParse(pragma, out var parsed))
                 {
+#if NET6_0_OR_GREATER
                     ref var script = ref CollectionsMarshal.GetValueRefOrAddDefault(this.scripts, parsed.Name, out _);
                     script = parsed;
+#else
+                    this.scripts[parsed.Name] = parsed;
+#endif
                     ++count;
                 }
                 else if (pragma.Name.Equals(Pragma.Version, StringComparison.OrdinalIgnoreCase))
                 {
-                    if (Version.TryParse(pragma.Meta, out var foundVersion) && foundVersion > this.version)
+                    if (
+#if NET6_0_OR_GREATER
+                        Version.TryParse(pragma.Meta, out var foundVersion)
+#else
+                        Version.TryParse(pragma.Meta.ToString(), out var foundVersion)
+#endif
+                        && foundVersion > this.version
+                        )
                     {
                         this.version = foundVersion;
                     }
@@ -447,7 +469,13 @@ record DbScriptParameter(string Name, DbType Type)
             if (sep > 0)
             {
                 var typeSize = typeName[(sep + 1)..].Trim().TrimEnd(')').Trim();
-                if (int.TryParse(typeSize, out var parsedSize))
+                if (
+#if NET6_0_OR_GREATER
+                    int.TryParse(typeSize, out var parsedSize)
+#else
+                    int.TryParse(typeSize.ToString(), out var parsedSize)
+#endif
+                    )
                 {
                     size = parsedSize;
                 }
