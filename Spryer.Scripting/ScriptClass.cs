@@ -1,12 +1,15 @@
-﻿namespace Spryer.CodeGen;
+﻿namespace Spryer.Scripting;
 
 using System;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
 
-sealed class ScriptClass : ICodeGenerator
+public sealed class ScriptClass : ICodeGenerator
 {
+    private static readonly char[] UsingSeparators = [';'];
+
     private const string DefaultUsings =
         """
         System;
@@ -83,9 +86,10 @@ sealed class ScriptClass : ICodeGenerator
 
     private void GenerateUsings(CodeBuilder code)
     {
-        var usings = DefaultUsings.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Concat(this.Usings.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        var usings = DefaultUsings.Split(UsingSeparators, StringSplitOptions.RemoveEmptyEntries)
+            .Concat(this.Usings.Split(UsingSeparators, StringSplitOptions.RemoveEmptyEntries))
             .Concat(this.scriptMap.Pragmas["using"])
+            .Select(u => u.Trim())
             //.Order(StringComparer.Ordinal)
             .Distinct(StringComparer.Ordinal);
 

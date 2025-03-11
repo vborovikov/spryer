@@ -1,5 +1,7 @@
 ﻿namespace Spryer.CodeGen;
 
+using Scripting;
+
 static class Program
 {
     static async Task<int> Main(string[] args)

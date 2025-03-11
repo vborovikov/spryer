@@ -173,7 +173,12 @@ public sealed class DbScriptMap
         /// <summary>
         /// Gets or sets a value indicating whether the loader should collect custom pragmas.
         /// </summary>
-        internal bool CollectsPragmas { get; init; }
+#if NETSTANDARD2_0
+        public
+#else
+        internal 
+#endif
+        bool CollectsPragmas { get; init; }
 
         /// <summary>
         /// Gets the loaded script collection.
@@ -343,6 +348,13 @@ public sealed class DbScriptMap
 
         private IEnumerable<string> EnumerateFilePaths(string scriptFileName)
         {
+#if NETSTANDARD2_0
+            if (Path.IsPathRooted(scriptFileName))
+            {
+                yield return scriptFileName;
+            }
+#endif
+
             if (this.Assembly is not null)
             {
                 // assembly directory

@@ -11,7 +11,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Spryer\Spryer.csproj" />
+    <ProjectReference Include="..\Spryer.Scripting\Spryer.Scripting.csproj" />
   </ItemGroup>
   
 </Project>

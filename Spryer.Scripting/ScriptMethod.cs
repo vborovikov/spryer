@@ -1,9 +1,8 @@
-﻿namespace Spryer.CodeGen;
+﻿namespace Spryer.Scripting;
 
 using System;
 using System.Data;
 using System.Linq;
-using Dapper;
 
 sealed record ScriptMethod(DbScript Script) : ICodeGenerator
 {
@@ -153,7 +152,7 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
             DbType.DateTimeOffset => "DateTimeOffset",
             DbType.Binary => "byte[]",
             DbType.Guid => "Guid",
-            _ => string.IsNullOrWhiteSpace(p.CustomType) ? "object" : p.CustomType
+            _ => string.IsNullOrWhiteSpace(p.CustomType) ? "object" : p.CustomType ?? "object"
         };
     }
 
@@ -161,19 +160,19 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
     {
         return this.Script.Type switch
         {
-            DbScriptType.Execute => nameof(SqlMapper.ExecuteAsync),
-            DbScriptType.ExecuteReader => nameof(SqlMapper.ExecuteReaderAsync),
-            DbScriptType.ExecuteScalar => nameof(SqlMapper.ExecuteScalarAsync),
-            DbScriptType.Query => nameof(SqlMapper.QueryAsync),
-            DbScriptType.QueryFirst => nameof(SqlMapper.QueryFirstAsync),
-            DbScriptType.QueryFirstOrDefault => nameof(SqlMapper.QueryFirstOrDefaultAsync),
-            DbScriptType.QuerySingle => nameof(SqlMapper.QuerySingleAsync),
-            DbScriptType.QuerySingleOrDefault => nameof(SqlMapper.QuerySingleOrDefaultAsync),
-            DbScriptType.QueryMultiple => nameof(SqlMapper.QueryMultipleAsync),
-            DbScriptType.QueryUnbuffered => nameof(SqlMapper.QueryUnbufferedAsync),
+            DbScriptType.Execute => "ExecuteAsync",
+            DbScriptType.ExecuteReader => "ExecuteReaderAsync",
+            DbScriptType.ExecuteScalar => "ExecuteScalarAsync",
+            DbScriptType.Query => "QueryAsync",
+            DbScriptType.QueryFirst => "QueryFirstAsync",
+            DbScriptType.QueryFirstOrDefault => "QueryFirstOrDefaultAsync",
+            DbScriptType.QuerySingle => "QuerySingleAsync",
+            DbScriptType.QuerySingleOrDefault => "QuerySingleOrDefaultAsync",
+            DbScriptType.QueryMultiple => "QueryMultipleAsync",
+            DbScriptType.QueryUnbuffered => "QueryUnbufferedAsync",
             DbScriptType.QueryText => "QueryTextAsync",
             DbScriptType.QueryJson => "QueryJsonAsync",
-            _ => nameof(SqlMapper.ExecuteAsync)
+            _ => "ExecuteAsync"
         } + GetDapperMethodGenericType();
     }
 

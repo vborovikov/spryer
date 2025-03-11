@@ -1,9 +1,12 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-using System.Text;
+namespace Spryer.Scripting;
 
-namespace Spryer.CodeGen;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text;
 
 /// <summary>
 ///     <para>
@@ -212,7 +215,17 @@ public class CodeBuilder
     {
         DoIndent();
 
-        _stringBuilder.AppendJoin(separator, values);
+        using var en = values.GetEnumerator();
+        if (en.MoveNext())
+        {
+            Append(en.Current);
+
+            while (en.MoveNext())
+            {
+                Append(separator);
+                Append(en.Current);
+            }
+        }
 
         return this;
     }
@@ -230,7 +243,7 @@ public class CodeBuilder
     {
         DoIndent();
 
-        _stringBuilder.AppendJoin(separator, values);
+        AppendJoin(values, separator);
 
         return this;
     }

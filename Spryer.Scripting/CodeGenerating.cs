@@ -1,4 +1,4 @@
-﻿namespace Spryer.CodeGen;
+﻿namespace Spryer.Scripting;
 
 using System;
 using System.Buffers;
@@ -19,7 +19,7 @@ static class CodeGenerating
         if (string.IsNullOrEmpty(input))
             return string.Empty;
 
-        return new string(Normalize(input.ToCharArray(), VarTrimChars));
+        return Normalize(input.ToCharArray(), VarTrimChars).ToString();
     }
 
     public static string ToCamelCase(this string input)
@@ -27,7 +27,7 @@ static class CodeGenerating
         if (string.IsNullOrEmpty(input))
             return string.Empty;
 
-        return new string(Normalize(input.ToCharArray(), VarTrimChars, camelCase: true));
+        return Normalize(input.ToCharArray(), VarTrimChars, camelCase: true).ToString();
     }
 
     private static ReadOnlySpan<char> Normalize(Span<char> span, SearchValues<char> trimChars, bool camelCase = false)
