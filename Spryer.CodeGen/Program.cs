@@ -8,7 +8,7 @@ static class Program
     {
         if (args.Length < 1)
         {
-            Console.Error.WriteLine("Usage: SpryerCodeGen <script file path> <code file path>");
+            Console.Error.WriteLine($"Usage: {Path.GetFileNameWithoutExtension(Environment.ProcessPath)} <script file path> <code file path>");
             return 1;
         }
 

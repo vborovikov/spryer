@@ -5,7 +5,7 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <AssemblyName>SpryerCodeGen</AssemblyName>
+    <AssemblyName>spryercg</AssemblyName>
     <Title>Spryer Code Generator</Title>
     <Description>Spryer SQL scripts wrapper class generator</Description>
   </PropertyGroup>
