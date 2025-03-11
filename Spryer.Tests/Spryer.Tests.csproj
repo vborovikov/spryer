@@ -20,6 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Spryer.BuildTasks\Spryer.BuildTasks.csproj" />
     <ProjectReference Include="..\Spryer\Spryer.csproj" />
     <ProjectReference Include="..\Spryer.Scripting\Spryer.Scripting.csproj">
       <Aliases>Standalone</Aliases>
