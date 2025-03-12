@@ -6,8 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>spryercg</AssemblyName>
-    <Title>Spryer Code Generator</Title>
-    <Description>Spryer SQL scripts wrapper class generator</Description>
+    <Description>Standalone DbScriptMap Code Generator</Description>
   </PropertyGroup>
 
   <ItemGroup>

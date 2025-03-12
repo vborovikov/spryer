@@ -22,6 +22,7 @@
     </PropertyGroup>
   </Target>
   <PropertyGroup>
+    <Title>Spryer</Title>
     <Authors>Vladislav Borovikov</Authors>
     <Company>$(Authors)</Company>
     <Copyright>Copyright © 2023-2025 Vladislav Borovikov</Copyright>

@@ -4,24 +4,67 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
-    <Title>Spryer.BuildTasks</Title>
     <Description>Spryer MSBuild Tasks</Description>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <PackageId>Spryer.BuildTasks</PackageId>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageProjectUrl>https://github.com/vborovikov/spryer</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/vborovikov/spryer.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>dapper;sql;msbuild</PackageTags>
+    <PackageReleaseNotes></PackageReleaseNotes>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <!--make sure that dependencies are copied to the output directory-->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <!--we need the assemblies bundled, so set this so we don't expose any dependencies to the outside world-->
+    <GenerateDependencyFile>true</GenerateDependencyFile>
+    <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);CopyProjectReferencesToPackage</TargetsForTfmSpecificBuildOutput>
+    <!--This property tells MSBuild where the root folder of the package's build assets should be. Because we are not a library package, we should not pack to 'lib'. Instead, we choose 'tasks' by convention.-->
+    <BuildOutputTargetFolder>tasks</BuildOutputTargetFolder>
+    <!--NuGet does validation that libraries in a package are exposed as dependencies, but we _explicitly_ do not want that behavior for MSBuild tasks. They are isolated by design. Therefore we ignore this specific warning.-->
+    <NoWarn>NU5100</NoWarn>
+    <DebugType>embedded</DebugType>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
   <ItemGroup>
-    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="17.11.4" />
+    <None Include="pkg\README.md" Pack="true" PackagePath="\" />
+    <None Include="pkg\Package.Build.props" Pack="true" PackagePath="build\$(PackageId).props" />
+    <None Include="pkg\Package.Build.targets" Pack="true" PackagePath="build\$(PackageId).targets" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="17.11.4" PrivateAssets="all" ExcludeAssets="Runtime" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Spryer.Scripting\Spryer.Scripting.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!--<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
-      <_Parameter1>Spryer.Tests</_Parameter1>
-    </AssemblyAttribute>-->
     <InternalsVisibleTo Include="Spryer.Tests" />
-
   </ItemGroup>
+
+  <Target Name="CopyProjectReferencesToPackage" DependsOnTargets="ResolveReferences">
+    <ItemGroup>
+      <!-- The dependencies of your MSBuild task must be packaged inside the package, they cannot be expressed as normal PackageReferences -->
+      <BuildOutputInPackage
+         Include="@(ReferenceCopyLocalPaths)"
+         TargetPath="%(ReferenceCopyLocalPaths.DestinationSubPath)" />
+    </ItemGroup>
+  </Target>
+
+  <!-- This target adds the generated deps.json file to our package output -->
+  <Target Name="AddBuildDependencyFileToBuiltProjectOutputGroupOutput"
+          BeforeTargets="BuiltProjectOutputGroup"
+          Condition=" '$(GenerateDependencyFile)' == 'true'">
+    <ItemGroup>
+      <BuiltProjectOutputGroupOutput
+          Include="$(ProjectDepsFilePath)"
+          TargetPath="$(ProjectDepsFileName)"
+          FinalOutputPath="$(ProjectDepsFilePath)" />
+    </ItemGroup>
+  </Target>
 
 </Project>

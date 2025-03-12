@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <_SpryerBuildTasksDirectory>$(MSBuildThisFileDirectory)..\tasks\netstandard2.0</_SpryerBuildTasksDirectory>
+    <_SpryerBuildTasksAssemblyFile>$(_SpryerBuildTasksDirectory)\$(MSBuildThisFileName).dll</_SpryerBuildTasksAssemblyFile>
+  </PropertyGroup>
+
+  <UsingTask TaskName="$(MSBuildThisFileName).GenerateScriptClasses" AssemblyFile="$(_SpryerBuildTasksAssemblyFile)"/>
+
+  <PropertyGroup>
+    <DbScriptMapCustomToolName Condition="$(DbScriptMapCustomToolName)==''">DbScriptMapCodeGenerator</DbScriptMapCustomToolName>
+  </PropertyGroup>
+</Project>

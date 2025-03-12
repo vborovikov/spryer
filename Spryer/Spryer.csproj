@@ -4,7 +4,6 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Title>Spryer</Title>
     <Description>Enum mapping and extensions for Dapper</Description>
   </PropertyGroup>
 
@@ -16,7 +15,7 @@
     <PackageProjectUrl>https://github.com/vborovikov/spryer</PackageProjectUrl>
     <RepositoryUrl>https://github.com/vborovikov/spryer.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageTags>dapper;dapper-extensions;orm;orm;sql;micro-orm</PackageTags>
+    <PackageTags>dapper;dapper-extensions;orm;sql;micro-orm</PackageTags>
     <PackageReleaseNotes></PackageReleaseNotes>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
   </PropertyGroup>

@@ -4,8 +4,7 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
-    <Title>Spryer.Scripting</Title>
-    <Description>Standalone DbScriptMap code generator</Description>
+    <Description>DbScriptMap Code Generator</Description>
   </PropertyGroup>
 
   <ItemGroup>
