@@ -15,7 +15,7 @@
           Inputs="@(DbScriptMapScriptFiles);@(DbScriptMapInlineScriptFiles)"
           Outputs="@(DbScriptMapSourceFiles)"
           Returns="@(DbScriptMapGeneratedFiles)"
-          Condition="'@(DbScriptMapScriptFiles)' != '' or '@(DbScriptMapInlineScriptFiles)' != ''">
+          Condition="'@(EmbeddedResource)' != '' or '@(None)' != ''">
     <ItemGroup>
       <_TempResourceFiles Remove="@(_TempResourceFiles)" />
       <_TempNoneFiles Remove="@(_TempNoneFiles)" />

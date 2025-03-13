@@ -297,7 +297,7 @@ public sealed class DbScriptMap
         /// <returns>A script raw text.</returns>
         protected virtual string? GetScriptText(Stream scriptStream)
         {
-            using var reader = new StreamReader(scriptStream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, bufferSize: -1, leaveOpen: false);
+            using var reader = new StreamReader(scriptStream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, bufferSize: 1024, leaveOpen: false);
             return reader.ReadToEnd();
         }
 
