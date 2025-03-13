@@ -42,7 +42,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Spryer.Scripting\Spryer.Scripting.csproj" />
+    <ProjectReference Include="..\Spryer.Scripting\Spryer.Scripting.csproj" PrivateAssets="all" />
     <InternalsVisibleTo Include="Spryer.Tests" />
   </ItemGroup>
 

@@ -76,7 +76,7 @@ public class GenerateDbScriptClasses : Task
 
         foreach (var scriptFileItem in scriptFileItems)
         {
-            var scriptFilePath = scriptFileItem.ItemSpec;
+            var scriptFilePath = scriptFileItem.GetMetadata("FullPath");
             var scriptFileId = scriptFileItem.GetMetadata("Identity");
 
             // load scripts
