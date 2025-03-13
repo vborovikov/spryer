@@ -1,6 +1,41 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <ItemGroup>
-    <DbScriptMapFiles Include="" />
-  </ItemGroup>
+
+  <Target Name="BeforeCompile"
+          Inputs="@(EmbeddedResource);@(None)"
+          Outputs="@(Compile)"
+          Returns="@(DbScriptMapGeneratedFiles)"
+          Condition="'@(EmbeddedResource)' != '' or '@(None)' != ''">
+    <ItemGroup>
+      <DbScriptMapScriptFiles Include="@(EmbeddedResource)" Condition="%(EmbeddedResource.Generator) == $(DbScriptMapCustomToolName)" />
+      <DbScriptMapInlineScriptFiles Include="@(None)" Condition="%(None.Generator) == $(DbScriptMapCustomToolName)" />
+      <DbScriptMapSourceFiles Include="@(Compile)" Condition="'%(Compile.DependentUpon)' != ''" />
+      
+      <_TempResourceFiles Remove="@(_TempResourceFiles)" />
+      <_TempNoneFiles Remove="@(_TempNoneFiles)" />
+    </ItemGroup>
+
+    <GenerateDbScriptClasses ScriptFiles="@(DbScriptMapScriptFiles)"
+                             InlineScriptFiles="@(DbScriptMapInlineScriptFiles)"
+                             SourceFiles="@(DbScriptMapSourceFiles)"
+                             RootDirectory="$(MSBuildProjectDirectory)"
+                             RootNamespace="$(RootNamespace)">
+      <Output TaskParameter="GeneratedFiles" ItemName="DbScriptMapGeneratedFiles" />
+      <Output TaskParameter="ScriptFilesWithLastGenOutput" ItemName="_TempResourceFiles" />
+      <Output TaskParameter="InlineScriptFilesWithLastGenOutput" ItemName="_TempNoneFiles" />
+    </GenerateDbScriptClasses>
+
+    <ItemGroup>
+      <EmbeddedResource Remove="@(EmbeddedResource)" 
+                        Condition="%(EmbeddedResource.Generator) == $(DbScriptMapCustomToolName) and '%(EmbeddedResource.LastGenOutput)' == ''" />
+      <EmbeddedResource Include="@(_TempResourceFiles)" />
+      <_TempResourceFiles Remove="@(_TempResourceFiles)" />
+
+      <None Remove="@(None)" Condition="%(None.Generator) == $(DbScriptMapCustomToolName) and '%(None.LastGenOutput)' == ''" />
+      <None Include="@(_TempNoneFiles)" />
+      <_TempNoneFiles Remove="@(_TempNoneFiles)" />
+
+    </ItemGroup>
+  </Target>
+  
 </Project>

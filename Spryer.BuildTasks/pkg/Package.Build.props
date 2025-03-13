@@ -5,7 +5,7 @@
     <_SpryerBuildTasksAssemblyFile>$(_SpryerBuildTasksDirectory)\$(MSBuildThisFileName).dll</_SpryerBuildTasksAssemblyFile>
   </PropertyGroup>
 
-  <UsingTask TaskName="$(MSBuildThisFileName).GenerateScriptClasses" AssemblyFile="$(_SpryerBuildTasksAssemblyFile)"/>
+  <UsingTask TaskName="$(MSBuildThisFileName).GenerateDbScriptClasses" AssemblyFile="$(_SpryerBuildTasksAssemblyFile)"/>
 
   <PropertyGroup>
     <DbScriptMapCustomToolName Condition="$(DbScriptMapCustomToolName)==''">DbScriptMapCodeGenerator</DbScriptMapCustomToolName>
