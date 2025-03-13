@@ -5,6 +5,7 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <Description>DbScriptMap Code Generator</Description>
+    <NoWarn>nullable</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

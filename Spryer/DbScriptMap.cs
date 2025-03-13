@@ -178,7 +178,8 @@ public sealed class DbScriptMap
 #else
         internal 
 #endif
-        bool CollectsPragmas { get; init; }
+        bool CollectsPragmas
+        { get; init; }
 
         /// <summary>
         /// Gets the loaded script collection.
