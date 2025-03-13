@@ -5,12 +5,15 @@
     <ItemGroup>
       <DbScriptMapScriptFiles Include="@(EmbeddedResource)" Condition="'%(EmbeddedResource.Generator)' == '$(DbScriptMapCustomToolName)'" />
       <DbScriptMapInlineScriptFiles Include="@(None)" Condition="'%(None.Generator)' == '$(DbScriptMapCustomToolName)'" />
-      <DbScriptMapSourceFiles Include="@(Compile)" Condition="'%(Compile.DependentUpon)' != '' or
+      <DbScriptMapSourceFiles Include="@(DbScriptMapScriptFiles->'%(Identity).cs');@(DbScriptMapInlineScriptFiles->'%(Identity).cs')" />
+      
+      <DbScriptMapSourceFiles Include="@(Compile)" 
+                              Condition="$([System.String]::new('%(Compile.DependentUpon)').EndsWith('.sql', System.StringComparison.OrdinalIgnoreCase)) or
                               $([System.String]::new('%(Compile.Filename)').EndsWith('.sql', System.StringComparison.OrdinalIgnoreCase))" />
     </ItemGroup>
   </Target>
-  
-  <Target Name="BeforeCompile" 
+
+  <Target Name="BeforeCompile"
           DependsOnTargets="_CollectDbScriptInputsOutputs"
           Inputs="@(DbScriptMapScriptFiles);@(DbScriptMapInlineScriptFiles)"
           Outputs="@(DbScriptMapSourceFiles)"
@@ -32,7 +35,7 @@
     </GenerateDbScriptClasses>
 
     <ItemGroup>
-      <EmbeddedResource Remove="@(EmbeddedResource)" 
+      <EmbeddedResource Remove="@(EmbeddedResource)"
                         Condition="'%(EmbeddedResource.Generator)' == '$(DbScriptMapCustomToolName)' and '%(EmbeddedResource.LastGenOutput)' == ''" />
       <EmbeddedResource Include="@(_TempResourceFiles)" />
       <_TempResourceFiles Remove="@(_TempResourceFiles)" />
@@ -42,5 +45,5 @@
       <_TempNoneFiles Remove="@(_TempNoneFiles)" />
     </ItemGroup>
   </Target>
-  
+
 </Project>

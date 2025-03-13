@@ -76,51 +76,74 @@ public class GenerateDbScriptClasses : Task
 
         foreach (var scriptFileItem in scriptFileItems)
         {
-            var scriptFilePath = scriptFileItem.GetMetadata("FullPath");
-            var scriptFileId = scriptFileItem.GetMetadata("Identity");
-
-            // load scripts
-            var scriptMapLoader = new DbScriptMap.Loader
+            try
             {
-                FileName = scriptFilePath,
-                CollectsPragmas = true,
-            };
-            if (!scriptMapLoader.TryLoadScripts()) continue;
+                var scriptFilePath = scriptFileItem.GetMetadata("FullPath");
 
-            // generate code
-            var scriptMap = scriptMapLoader.GetScriptMap();
-            var scriptClass = new ScriptClass(scriptMap)
+                // load scripts
+                var scriptMapLoader = new DbScriptMap.Loader
+                {
+                    FileName = scriptFilePath,
+                    CollectsPragmas = true,
+                };
+                if (!scriptMapLoader.TryLoadScripts()) continue;
+
+                // generate code
+                var scriptMap = scriptMapLoader.GetScriptMap();
+                var scriptClass = new ScriptClass(scriptMap)
+                {
+                    Namespace = scriptFileItem.GetMetadata("CustomToolNamespace") ?? this.RootNamespace,
+                };
+                var code = new CodeBuilder();
+                scriptClass.Generate(code);
+
+                // save file
+                var generatedFileId = GetGeneratedFileId(scriptFileItem);
+
+                var generatedFilePath = Path.Combine(
+                    this.RootDirectory ?? scriptFileItem.GetMetadata("DefiningProjectDirectory") ?? Path.GetDirectoryName(scriptFilePath) ?? string.Empty,
+                    generatedFileId);
+
+                this.Log.LogMessage(MessageImportance.Normal, $"Generating {generatedFilePath}");
+                var directory = Path.GetDirectoryName(generatedFilePath);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                File.WriteAllText(generatedFilePath, code.ToString());
+
+                // update metadata
+                var generatedFileItem = new TaskItem(generatedFilePath);
+                generatedFileItem.SetMetadata("DependentUpon", scriptFileItem.GetMetadata("Identity"));
+                generatedFiles.Add(generatedFileItem);
+
+                if (scriptFileItem.GetMetadata("LastGenOutput") is not string lastGenOutput || string.IsNullOrWhiteSpace(lastGenOutput))
+                {
+                    scriptFileItem.SetMetadata("LastGenOutput", generatedFileId);
+                    itemsWithLastGenOutput.Add(scriptFileItem);
+                }
+            }
+            catch (Exception x)
             {
-                Namespace = scriptFileItem.GetMetadata("CustomToolNamespace") ?? this.RootNamespace,
-            };
-            var code = new CodeBuilder();
-            scriptClass.Generate(code);
-
-            // save file
-            var generatedFileId =
-                scriptFileItem.GetMetadata("LastGenOutput") ??
-                Array.Find(this.SourceFiles, it => string.Equals(it.GetMetadata("DependentUpon"),
-                    scriptFileId, StringComparison.Ordinal))?.GetMetadata("Identity") ??
-                scriptFileId + ".cs";
-
-            var generatedFilePath = Path.Combine(
-                this.RootDirectory ?? scriptFileItem.GetMetadata("DefiningProjectDirectory") ?? Path.GetDirectoryName(scriptFilePath) ?? string.Empty,
-                generatedFileId);
-
-            File.WriteAllText(generatedFilePath, code.ToString());
-
-            // update metadata
-            var generatedFileItem = new TaskItem(generatedFilePath);
-            generatedFileItem.SetMetadata("DependentUpon", scriptFileId);
-            generatedFiles.Add(generatedFileItem);
-
-            if (scriptFileItem.GetMetadata("LastGenOutput") is not string lastGenOutput || string.IsNullOrWhiteSpace(lastGenOutput))
-            {
-                scriptFileItem.SetMetadata("LastGenOutput", generatedFileId);
-                itemsWithLastGenOutput.Add(scriptFileItem);
+                this.Log.LogErrorFromException(x, true);
             }
         }
 
         return itemsWithLastGenOutput.ToArray();
+    }
+
+    private string GetGeneratedFileId(ITaskItem scriptFileItem)
+    {
+        if (scriptFileItem.GetMetadata("LastGenOutput") is string lastGenOutput && !string.IsNullOrWhiteSpace(lastGenOutput))
+            return lastGenOutput;
+
+        var scriptFileId = scriptFileItem.GetMetadata("Identity");
+        var sourceFileId = Array.Find(this.SourceFiles,
+            it => string.Equals(it.GetMetadata("DependentUpon"), scriptFileId, StringComparison.Ordinal))?.GetMetadata("Identity");
+        if (!string.IsNullOrWhiteSpace(sourceFileId))
+            return sourceFileId;
+
+        return scriptFileId + ".cs";
     }
 }
