@@ -3,7 +3,7 @@ namespace Spryer;
 using Dapper;
 
 /// <summary>
-/// A static class containing extension methods for Dapper.
+/// Provides extension methods for Dapper.
 /// </summary>
 public static class DapperExtensions
 {
