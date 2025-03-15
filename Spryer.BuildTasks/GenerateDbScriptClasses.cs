@@ -63,14 +63,14 @@ public class GenerateDbScriptClasses : Task
         var generatedFiles = new List<ITaskItem>();
 
         this.ScriptFilesWithLastGenOutput = GenerateCode(this.ScriptFiles, generatedFiles, inlineScripts: false);
-        //this.InlineScriptFilesWithLastGenOutput = GenerateCode(this.InlineScriptFiles, generatedFiles, inlineScripts: true);
+        this.InlineScriptFilesWithLastGenOutput = GenerateCode(this.InlineScriptFiles, generatedFiles, inlineScripts: true);
 
         this.GeneratedFiles = generatedFiles.ToArray();
 
         return !this.Log.HasLoggedErrors;
     }
 
-    private ITaskItem[] GenerateCode(ITaskItem[] scriptFileItems, List<ITaskItem> generatedFiles, bool inlineScripts)
+    private ITaskItem[] GenerateCode(ITaskItem[] scriptFileItems, IList<ITaskItem> generatedFiles, bool inlineScripts)
     {
         var itemsWithLastGenOutput = new List<ITaskItem>();
 
@@ -93,6 +93,7 @@ public class GenerateDbScriptClasses : Task
                 var scriptClass = new ScriptClass(scriptMap)
                 {
                     Namespace = scriptFileItem.GetMetadata("CustomToolNamespace") ?? this.RootNamespace,
+                    IsInline = inlineScripts,
                 };
                 var code = new CodeBuilder();
                 scriptClass.Generate(code);
