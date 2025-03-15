@@ -44,6 +44,13 @@ public sealed class ScriptClass : ICodeGenerator
 
     private void GenerateClass(CodeBuilder code)
     {
+        code.AppendLines(
+            $"""
+            /// <summary>
+            /// Provides extension methods for the database operations
+            /// described in the script file {Path.GetFileName(this.scriptMap.Source)}.
+            /// </summary>
+            """);
         code.AppendLine($"internal static partial class {GetClassName()}");
         code.AppendLine("{");
 
@@ -83,8 +90,14 @@ public sealed class ScriptClass : ICodeGenerator
     {
         code.AppendLines(
             $$"""
+            /// <summary>
+            /// The <see cref="DbScriptMap"/> instance for this class.
+            /// </summary>
             private static readonly DbScriptMap sql;
 
+            /// <summary>
+            /// Loads the SQL scripts from the file {{Path.GetFileName(this.scriptMap.Source)}}.
+            /// </summary>
             static {{GetClassName()}}()
             {
                 sql = DbScriptMap.Load("{{Path.GetFileName(this.scriptMap.Source)}}");

@@ -15,7 +15,7 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
     {
         var methodName = GetMethodName();
 
-        //todo: generate xml comments
+        GenerateXmlDocs(code);
 
         // method signature
         code.Append($"public static {GetDapperMethodReturnType()} {methodName}{GetDapperMethodGenericType()}(this DbConnection {Cnn}");
@@ -93,9 +93,11 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
 
         if (this.Script.Type is DbScriptType.Execute or DbScriptType.ExecuteReader or DbScriptType.ExecuteScalar)
         {
+            code.AppendLine();
+            GenerateXmlDocs(code, usesTransaction: true);
+
             // method signature
-            code.AppendLine()
-                .Append($"public static {GetDapperMethodReturnType()} {methodName}{GetDapperMethodGenericType()}(this DbTransaction {Tx}");
+            code.Append($"public static {GetDapperMethodReturnType()} {methodName}{GetDapperMethodGenericType()}(this DbTransaction {Tx}");
             if (!string.IsNullOrWhiteSpace(parameters))
             {
                 code.Append(',')
@@ -135,6 +137,89 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
             }
             code.Append('}').AppendLine();
         }
+    }
+
+    private void GenerateXmlDocs(CodeBuilder code, bool usesTransaction = false)
+    {
+        code.AppendLines(
+            $"""
+            /// <summary>
+            /// {GetMethodDescription()}
+            /// </summary>
+            """);
+        
+        if (this.Script.Type is not DbScriptType.Execute and not DbScriptType.ExecuteReader and
+            not DbScriptType.QueryMultiple and not DbScriptType.QueryText)
+        {
+            code.AppendLine("/// <typeparam name=\"T\">The type of the result.</typeparam>");
+        }
+
+        if (usesTransaction)
+        {
+            code.AppendLine($"/// <param name=\"{Tx}\">The transaction to use for this query.</param>");
+        }
+        else
+        {
+            code.AppendLine($"/// <param name=\"{Cnn}\">The connection to use for this query.</param>");
+        }
+
+        foreach (var p in this.Script.Parameters)
+        {
+            code.AppendLine($"/// <param name=\"{p.Name.ToCamelCase()}\">The query parameter {p.Name} of type {p.Type}.</param>");
+        }
+
+        if (!usesTransaction)
+        {
+            code.AppendLine("/// <param name=\"transaction\">The transaction to use for this query.</param>");
+        }
+        code.AppendLines(
+            $"""
+            /// <param name="commandTimeout">Number of seconds before command execution timeout.</param>
+            /// <param name="commandType">Is it a stored proc or a batch?</param>
+            /// <returns>
+            /// {GetMethodResultDescription()}
+            /// </returns>
+            """);
+    }
+
+    private string GetMethodDescription()
+    {
+        return this.Script.Type switch
+        {
+            DbScriptType.Execute => "Executes a command and returns the number of rows affected.",
+            DbScriptType.ExecuteReader => "Executes a command and returns a <see cref=\"DbDataReader\" />.",
+            DbScriptType.ExecuteScalar => "Executes a command and returns the first column of the first row in the result set returned by the query.",
+            DbScriptType.Query => "Executes a query and returns the results as an <see cref=\"IEnumerable{T}\" />.",
+            DbScriptType.QueryFirst => "Executes a query and returns the first result.",
+            DbScriptType.QueryFirstOrDefault => "Executes a query and returns the first result, or the default value if no results are found.",
+            DbScriptType.QuerySingle => "Executes a query and returns a single result.",
+            DbScriptType.QuerySingleOrDefault => "Executes a query and returns a single result, or the default value if no results are found.",
+            DbScriptType.QueryMultiple => "Executes a query and returns a <see cref=\"SqlMapper.GridReader\" />.",
+            DbScriptType.QueryUnbuffered => "Executes a query and returns the results as an <see cref=\"IAsyncEnumerable{T}\" />.",
+            DbScriptType.QueryText => "Executes a query and returns the result as a string.",
+            DbScriptType.QueryJson => "Executes a query and returns the result as a JSON object.",
+            _ => "Executes a SQL command."
+        };
+    }
+
+    private string GetMethodResultDescription()
+    {
+        return this.Script.Type switch
+        {
+            DbScriptType.Execute => "The number of rows affected.",
+            DbScriptType.ExecuteReader => "The <see cref=\"DbDataReader\" />.",
+            DbScriptType.ExecuteScalar => "The first column of the first row in the result set, or a null reference if the result set is empty.",
+            DbScriptType.Query => "The results as an <see cref=\"IEnumerable{T}\" />.",
+            DbScriptType.QueryFirst => "The first result.",
+            DbScriptType.QueryFirstOrDefault => "The first result, or the default value if no results are found.",
+            DbScriptType.QuerySingle => "A single result.",
+            DbScriptType.QuerySingleOrDefault => "A single result, or the default value if no results are found.",
+            DbScriptType.QueryMultiple => "A <see cref=\"SqlMapper.GridReader\" />.",
+            DbScriptType.QueryUnbuffered => "The results as an <see cref=\"IAsyncEnumerable{T}\" />.",
+            DbScriptType.QueryText => "The result as a string.",
+            DbScriptType.QueryJson => "The result as a JSON object.",
+            _ => "The result of the command."
+        };
     }
 
     private string GetMethodName()
@@ -229,7 +314,7 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
         return this.Script.Type switch
         {
             DbScriptType.Execute => "Task<int>",
-            DbScriptType.ExecuteReader => "Task<IDataReader>",
+            DbScriptType.ExecuteReader => "Task<DbDataReader>",
             DbScriptType.ExecuteScalar => "Task<T?>",
             DbScriptType.Query => "Task<IEnumerable<T>>",
             DbScriptType.QueryFirst => "Task<T>",
