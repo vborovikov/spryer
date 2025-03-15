@@ -9,14 +9,16 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
     private const string Cnn = "connection";
     private const string Tx = "transaction";
 
+    public bool IsInline { get; set; }
+
     public void Generate(CodeBuilder code)
     {
-        var methodName = this.Script.Name.ToPascalCase();
+        var methodName = GetMethodName();
 
         //todo: generate xml comments
 
         // method signature
-        code.Append($"public static {GetDapperMethodReturnType()} {methodName}Async{GetDapperMethodGenericType()}(this IDbConnection {Cnn}");
+        code.Append($"public static {GetDapperMethodReturnType()} {methodName}{GetDapperMethodGenericType()}(this DbConnection {Cnn}");
         var parameters = GetParameters();
         if (!string.IsNullOrWhiteSpace(parameters))
         {
@@ -26,17 +28,47 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
                 .Append(parameters)
                 .DecrementIndent();
         }
-        code.Append(')').AppendLine();
+
+        // SqlMapper parameters
+        code.Append(',')
+            .AppendLine()
+            .IncrementIndent()
+            .Append("IDbTransaction? transaction = null, int? commandTimeout = null, CommandType? commandType = null)")
+            .AppendLine()
+            .DecrementIndent();
 
         // method body
         code.Append('{').AppendLine();
         var arguments = GetArguments();
         using (code.Indent())
         {
-            code.Append($"return {Cnn}.{GetDapperMethod()}(sql[\"{this.Script.Name}\"]");
-            if (!string.IsNullOrWhiteSpace(arguments))
+            code.Append($"return {Cnn}.{GetDapperMethod()}(");
+            if (this.IsInline)
             {
-                //todo: check for (@Parameters object) special case
+                code.AppendLine()
+                    .IncrementIndent()
+                    .AppendLine("\"\"\"")
+                    .AppendLines(this.Script.Text)
+                    .Append("\"\"\"")
+                    .DecrementIndent();
+            }
+            else
+            {
+                code.Append($"sql[\"{this.Script.Name}\"]");
+            }
+
+            if (this.Script.Parameters is [{ Name: "Parameters", Type: DbType.Object } dynamicParams])
+            {
+                // pass (@Parameters object) as is
+                code.Append(',')
+                    .AppendLine()
+                    .IncrementIndent()
+                    .Append($"param: {dynamicParams.Name.ToCamelCase()}")
+                    .DecrementIndent();
+
+            }
+            else if (!string.IsNullOrWhiteSpace(arguments))
+            {
 
                 code.Append(',')
                     .AppendLine()
@@ -49,17 +81,21 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
                     .Append('}')
                     .DecrementIndent();
             }
-            code.AppendLine(");");
+
+            // SqlMapper arguments
+
+            code.AppendLine(",")
+                .IncrementIndent()
+                .AppendLine("transaction: transaction, commandTimeout: commandTimeout, commandType: commandType);")
+                .DecrementIndent();
         }
         code.Append('}').AppendLine();
 
         if (this.Script.Type is DbScriptType.Execute or DbScriptType.ExecuteReader or DbScriptType.ExecuteScalar)
         {
-            //todo: implement through calling the non-transactional method
-
             // method signature
             code.AppendLine()
-                .Append($"public static {GetDapperMethodReturnType()} {methodName}Async{GetDapperMethodGenericType()}(this IDbTransaction {Tx}");
+                .Append($"public static {GetDapperMethodReturnType()} {methodName}{GetDapperMethodGenericType()}(this DbTransaction {Tx}");
             if (!string.IsNullOrWhiteSpace(parameters))
             {
                 code.Append(',')
@@ -68,30 +104,42 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
                     .Append(parameters)
                     .DecrementIndent();
             }
-            code.Append(')').AppendLine();
+            // SqlMapper parameters
+            code.Append(',')
+                .AppendLine()
+                .IncrementIndent()
+                .Append("int? commandTimeout = null, CommandType? commandType = null)")
+                .AppendLine()
+                .DecrementIndent();
 
             // method body
             code.Append('{').AppendLine();
             using (code.Indent())
             {
-                code.Append($"return {Tx}.Connection!.{GetDapperMethod()}(sql[\"{this.Script.Name}\"]");
-                if (!string.IsNullOrWhiteSpace(arguments))
+                code.Append($"return {methodName}{GetDapperMethodGenericType()}({Tx}.Connection!");
+                if (this.Script.Parameters.Length > 0)
                 {
                     code.Append(',')
                         .AppendLine()
                         .IncrementIndent()
-                        .AppendLine("param: new")
-                        .Append('{').AppendLine()
-                        .IncrementIndent()
-                        .AppendLines(arguments)
-                        .DecrementIndent()
-                        .Append('}')
+                        .Append(string.Join(", ", this.Script.Parameters.Select(p => p.Name.ToCamelCase())))
                         .DecrementIndent();
                 }
-                code.AppendLine($", transaction: {Tx});");
+
+                // SqlMapper arguments
+                code.AppendLine(",")
+                    .IncrementIndent()
+                    .AppendLine($"transaction: {Tx}, commandTimeout: commandTimeout, commandType: commandType);")
+                    .DecrementIndent();
+
             }
             code.Append('}').AppendLine();
         }
+    }
+
+    private string GetMethodName()
+    {
+        return $"{this.Script.Name.ToPascalCase()}Async";
     }
 
     private string GetArguments()
@@ -144,15 +192,15 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
             DbType.StringFixedLength or
             DbType.AnsiStringFixedLength or
             DbType.VarNumeric or
-            DbType.Xml => "string",
+            DbType.Xml => "string?",
             DbType.DateTime or
             DbType.DateTime2 or
             DbType.Date or
             DbType.Time => "DateTime",
             DbType.DateTimeOffset => "DateTimeOffset",
             DbType.Binary => "byte[]",
-            DbType.Guid => "Guid",
-            _ => string.IsNullOrWhiteSpace(p.CustomType) ? "object" : p.CustomType ?? "object"
+            DbType.Guid => "Guid?",
+            _ => string.IsNullOrWhiteSpace(p.CustomType) ? "object" : p.CustomType ?? "object?"
         };
     }
 

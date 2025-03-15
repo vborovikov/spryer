@@ -15,6 +15,7 @@ public sealed class ScriptClass : ICodeGenerator
         System;
         System.Collections.Generic;
         System.Data;
+        System.Data.Common;
         System.Threading.Tasks;
         Dapper;
         Spryer;
@@ -30,6 +31,7 @@ public sealed class ScriptClass : ICodeGenerator
     public string? Name { get; set; }
     public string? Namespace { get; set; }
     public string Usings { get; set; } = DefaultUsings;
+    public bool IsInline { get; set; }
 
     public void Generate(CodeBuilder code)
     {
@@ -47,12 +49,18 @@ public sealed class ScriptClass : ICodeGenerator
 
         using (code.Indent())
         {
-            GenerateCtor(code);
+            if (!this.IsInline)
+            {
+                GenerateCtor(code);
+            }
 
             foreach (var script in this.scriptMap.Enumerate())
             {
                 code.AppendLine();
-                var scriptMethod = new ScriptMethod(script);
+                var scriptMethod = new ScriptMethod(script)
+                {
+                    IsInline = this.IsInline,
+                };
                 scriptMethod.Generate(code);
             }
         }
