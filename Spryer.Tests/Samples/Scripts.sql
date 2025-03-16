@@ -12,7 +12,7 @@ execute-scalar Multiline(@Description nvarchar(100),
 select 1;
 
 --@script TestSelect
-SELECT Id, Name, Email, Address 
+SELECT Id, Name, Email, Address
 FROM Users
 WHERE Id = @Id;
 

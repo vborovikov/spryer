@@ -12,7 +12,7 @@ public class DbScriptTests
 
         Assert.AreEqual(
             """
-            SELECT Id, Name, Email, Address 
+            SELECT Id, Name, Email, Address
             FROM Users
             WHERE Id = @Id;
             """,
@@ -139,5 +139,44 @@ public class DbScriptTests
         var pragmaEnumerator = Pragma.Enumerate(pragmaText);
         Assert.IsTrue(pragmaEnumerator.MoveNext());
         return pragmaEnumerator.Current;
+    }
+
+    [TestMethod]
+    public void PragmaEnumerate_EndMarkerAtEOF_NotIncluded()
+    {
+        var pragma = CreatePragma(
+            """
+            --@query SearchRecipes(@Parameters object)
+            select @TotalCount = count(r.Id)
+            from book.Recipes r;
+
+            --select @FilterCount = count(distinct r.Id)
+            --from book.Recipes r
+            --left outer join book.RecipeFoods rf on rf.RecipeId = r.Id
+            --left outer join book.Foods f on f.Id = rf.FoodId
+            --where 
+            --    charindex(@Search, r.Name) > 0 or 
+            --    charindex(@Search, r.Description) > 0 or 
+            --    charindex(@Search, r.Instructions) > 0 or
+            --    charindex(@Search, f.Name) > 0;
+
+            select distinct r.Id, r.Name, rs.Link, r.Description, len(r.Instructions) as Care
+            from book.Recipes r
+            inner join book.RecipeSources rs on rs.RecipeId = r.Id
+            left outer join book.RecipeFoods rf on rf.RecipeId = r.Id
+            left outer join book.Foods f on f.Id = rf.FoodId
+            where 
+                charindex(@Search, r.Name) > 0 or 
+                charindex(@Search, r.Description) > 0 or 
+                charindex(@Search, r.Instructions) > 0 or
+                charindex(@Search, f.Name) > 0
+            order by Care desc
+            offset @SkipCount rows fetch next @TakeCount rows only;
+
+            select @FilterCount = @@RowCount;
+
+            --@
+            """);
+        Assert.IsFalse(pragma.Data.EndsWith("--@"));
     }
 }

@@ -14,7 +14,7 @@ public class StandaloneDbScriptTests
 
         Assert.AreEqual(
             """
-            SELECT Id, Name, Email, Address 
+            SELECT Id, Name, Email, Address
             FROM Users
             WHERE Id = @Id;
             """,

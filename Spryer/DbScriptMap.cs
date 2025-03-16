@@ -890,9 +890,17 @@ readonly ref struct Pragma
 
         while (span.Length > 0)
         {
-            var index = span.IndexOf('@') - Marker.Length + 1;
+            var index = span.IndexOf('@');
             if (index < 0) break;
+            if (index < (Marker.Length - 1))
+            {
+                ++index;
+                span = span[index..];
+                offset += index;
+                continue;
+            }
 
+            index -= Marker.Length - 1;
             span = span[index..];
             offset += index;
 
