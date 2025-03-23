@@ -119,8 +119,12 @@ public sealed class DbScriptMap
         };
         loader.TryLoadScripts();
 
-        loader.Assembly = Assembly.GetEntryAssembly();
-        loader.TryLoadScripts();
+        var entryAssembly = Assembly.GetEntryAssembly();
+        if (entryAssembly != callingAssembly)
+        {
+            loader.Assembly = Assembly.GetEntryAssembly();
+            loader.TryLoadScripts();
+        }
 
         loader.Assembly = null;
         loader.TryLoadScripts();
@@ -176,7 +180,7 @@ public sealed class DbScriptMap
 #if NETSTANDARD2_0
         public
 #else
-        internal 
+        internal
 #endif
         bool CollectsPragmas
         { get; init; }
