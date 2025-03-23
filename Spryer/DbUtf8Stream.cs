@@ -57,10 +57,10 @@ sealed class DbUtf8Stream : Stream
                 this.dataOffset = 0L;
             }
 
-            if (this.reader.TryGetBytes(0, this.dataOffset, out var dataRead, buffer, offset + total, count - total, out var read))
+            if (this.reader.TryGetBytes(0, this.dataOffset, out var charsRead, buffer, offset + total, count - total, out var bytesWritten))
             {
-                total += (int)read;
-                this.dataOffset += dataRead;
+                total += bytesWritten;
+                this.dataOffset += charsRead;
             }
             else
             {
@@ -109,15 +109,15 @@ sealed class DbUtf8Stream : Stream
     /// <summary>
     /// Decodes UTF-16 characters into UTF-8 bytes.
     /// </summary>
-    struct DbUtf8Reader : IDisposable, IAsyncDisposable
+    class DbUtf8Reader : IDisposable, IAsyncDisposable
     {
         private const int TranscodingFactor = 3;
-        private const int DefaultBufferSize = 1024 * 1024 * TranscodingFactor;
+        private const int DefaultBufferSize =1024 * 1024 * TranscodingFactor;
 
         private readonly DbDataReader reader;
         private char[]? chars;
         private int charsWritten;
-        private int charsTranscoded;
+        private int charsConsumed;
 
         public DbUtf8Reader(DbDataReader reader)
         {
@@ -125,7 +125,7 @@ sealed class DbUtf8Stream : Stream
             this.chars = ArrayPool<char>.Shared.Rent(DefaultBufferSize);
         }
 
-        public readonly bool IsClosed => this.reader.IsClosed;
+        public bool IsClosed => this.reader.IsClosed;
 
         public void Dispose()
         {
@@ -139,40 +139,40 @@ sealed class DbUtf8Stream : Stream
             return this.reader.DisposeAsync();
         }
 
-        public readonly bool Read() => this.reader.Read();
+        public bool Read() => this.reader.Read();
 
-        public readonly Task<bool> ReadAsync(CancellationToken cancellationToken) => this.reader.ReadAsync(cancellationToken);
+        public Task<bool> ReadAsync(CancellationToken cancellationToken) => this.reader.ReadAsync(cancellationToken);
 
         public bool TryGetBytes(int ordinal, long dataOffset, out int charsRead, byte[]? buffer, int bufferOffset, int length, out int bytesWritten)
         {
             ObjectDisposedException.ThrowIf(this.chars is null, this);
 
             charsRead = 0;
-            var actualLength = Math.Min(this.chars.Length - this.charsWritten, length / TranscodingFactor);
-            if (actualLength > 0)
+            var charsLength = this.chars.Length - this.charsWritten;
+            if (this.charsConsumed == 0 && charsLength > 0)
             {
-                charsRead = (int)this.reader.GetChars(ordinal, dataOffset, this.chars, this.charsWritten, actualLength);
-                if (charsRead > 0)
-                {
-                    this.charsWritten += charsRead;
-                }
-                else if (this.charsTranscoded == this.charsWritten)
+                charsRead = (int)this.reader.GetChars(ordinal, dataOffset, this.chars, this.charsWritten, charsLength);
+
+                this.charsWritten += charsRead;
+                if (this.charsWritten == 0)
                 {
                     bytesWritten = 0;
                     return false;
                 }
             }
 
-            var status = Utf8.FromUtf16(this.chars.AsSpan(this.charsTranscoded, this.charsWritten - this.charsTranscoded),
-                buffer.AsSpan(bufferOffset, length), out var charsTranscodedNow, out bytesWritten);
+            var status = Utf8.FromUtf16(this.chars.AsSpan(this.charsConsumed, this.charsWritten - this.charsConsumed),
+                buffer.AsSpan(bufferOffset, length), out var charsTranscoded, out bytesWritten,
+                isFinalBlock: charsLength > charsRead);
 
             if (status != OperationStatus.InvalidData)
             {
-                this.charsTranscoded += charsTranscodedNow;
-                if (this.charsTranscoded == this.charsWritten)
+                this.charsConsumed += charsTranscoded;
+
+                if (this.charsConsumed == this.charsWritten)
                 {
                     this.charsWritten = 0;
-                    this.charsTranscoded = 0;
+                    this.charsConsumed = 0;
                 }
 
                 return true;
