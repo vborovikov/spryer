@@ -27,7 +27,7 @@ public static class SqlMapperExtensions
     public static async Task<string> QueryTextAsync(this DbConnection cnn, string sql, object? param = null,
         IDbTransaction? transaction = null, int? commandTimeout = null, CommandType? commandType = null)
     {
-        await using var reader = await cnn.ExecuteReaderAsync(sql, param, transaction, commandTimeout, commandType);
+        await using var reader = await cnn.ExecuteReaderAsync(sql, param, transaction, commandTimeout, commandType).ConfigureAwait(false);
         var text = new StringBuilder(DefaultTextCapacity);
         while (await reader.ReadAsync())
         {
@@ -51,13 +51,8 @@ public static class SqlMapperExtensions
     public static async Task<T?> QueryJsonAsync<T>(this DbConnection cnn, string sql, object? param = null,
         IDbTransaction? transaction = null, int? commandTimeout = null, CommandType? commandType = null, JsonSerializerOptions? jsonOptions = null)
     {
-        //todo: use Utf8JsonReader/GrowBuffer
-
-        var json = await cnn.QueryTextAsync(sql, param, transaction, commandTimeout, commandType);
-        if (json.Length == 0)
-            return default;
-
-        return JsonSerializer.Deserialize<T>(json, jsonOptions);
+        await using var reader = await cnn.ExecuteReaderAsync(sql, param, transaction, commandTimeout, commandType).ConfigureAwait(false);
+        return await ReadJsonAsync<T>(reader, jsonOptions).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -73,13 +68,8 @@ public static class SqlMapperExtensions
     public static async Task<string> QueryTextAsync(this IDbConnection cnn, string sql, object? param = null,
         IDbTransaction? transaction = null, int? commandTimeout = null, CommandType? commandType = null)
     {
-        using var reader = await cnn.ExecuteReaderAsync(sql, param, transaction, commandTimeout, commandType);
-        var text = new StringBuilder(DefaultTextCapacity);
-        while (reader.Read())
-        {
-            text.Append(reader.GetString(0));
-        }
-        return text.ToString();
+        using var reader = await cnn.ExecuteReaderAsync(sql, param, transaction, commandTimeout, commandType).ConfigureAwait(false);
+        return ReadAllText(reader);
     }
 
     /// <summary>
@@ -97,10 +87,35 @@ public static class SqlMapperExtensions
     public static async Task<T?> QueryJsonAsync<T>(this IDbConnection cnn, string sql, object? param = null,
         IDbTransaction? transaction = null, int? commandTimeout = null, CommandType? commandType = null, JsonSerializerOptions? jsonOptions = null)
     {
-        var json = await cnn.QueryTextAsync(sql, param, transaction, commandTimeout, commandType);
-        if (json.Length == 0)
+        using var baseReader = await cnn.ExecuteReaderAsync(sql, param, transaction, commandTimeout, commandType).ConfigureAwait(false);
+        if (baseReader is not DbDataReader reader)
+        {
+            var json = ReadAllText(baseReader);
+            if (string.IsNullOrWhiteSpace(json))
+                return default;
+
+            return JsonSerializer.Deserialize<T>(json, jsonOptions);
+        }
+
+        return await ReadJsonAsync<T>(reader, jsonOptions).ConfigureAwait(false);
+    }
+
+    private static async Task<T?> ReadJsonAsync<T>(DbDataReader reader, JsonSerializerOptions? jsonOptions)
+    {
+        if (!reader.HasRows)
             return default;
 
-        return JsonSerializer.Deserialize<T>(json, jsonOptions);
+        await using var stream = new DbUtf8Stream(reader);
+        return await JsonSerializer.DeserializeAsync<T>(stream, jsonOptions).ConfigureAwait(false);
+    }
+
+    private static string ReadAllText(IDataReader reader)
+    {
+        var text = new StringBuilder(DefaultTextCapacity);
+        while (reader.Read())
+        {
+            text.Append(reader.GetString(0));
+        }
+        return text.ToString();
     }
 }
