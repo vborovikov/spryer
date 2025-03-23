@@ -115,14 +115,14 @@ sealed class DbUtf8Stream : Stream
         private const int DefaultBufferSize = 1024 * 1024 * TranscodingFactor;
 
         private readonly DbDataReader reader;
-        private char[]? buffer;
-        private int written;
-        private int transcoded;
+        private char[]? chars;
+        private int charsWritten;
+        private int charsTranscoded;
 
         public DbUtf8Reader(DbDataReader reader)
         {
             this.reader = reader;
-            this.buffer = ArrayPool<char>.Shared.Rent(DefaultBufferSize);
+            this.chars = ArrayPool<char>.Shared.Rent(DefaultBufferSize);
         }
 
         public readonly bool IsClosed => this.reader.IsClosed;
@@ -145,64 +145,50 @@ sealed class DbUtf8Stream : Stream
 
         public bool TryGetBytes(int ordinal, long dataOffset, out int charsRead, byte[]? buffer, int bufferOffset, int length, out int bytesWritten)
         {
-            ObjectDisposedException.ThrowIf(this.buffer is null, this);
+            ObjectDisposedException.ThrowIf(this.chars is null, this);
 
             charsRead = 0;
-            var actualLength = Math.Min(this.buffer.Length - this.written, length / TranscodingFactor);
+            var actualLength = Math.Min(this.chars.Length - this.charsWritten, length / TranscodingFactor);
             if (actualLength > 0)
             {
-                charsRead = (int)this.reader.GetChars(ordinal, dataOffset, this.buffer, this.written, actualLength);
+                charsRead = (int)this.reader.GetChars(ordinal, dataOffset, this.chars, this.charsWritten, actualLength);
                 if (charsRead > 0)
                 {
-                    MarkWritten(charsRead);
+                    this.charsWritten += charsRead;
                 }
-                else if (this.transcoded == this.written)
+                else if (this.charsTranscoded == this.charsWritten)
                 {
                     bytesWritten = 0;
                     return false;
                 }
             }
 
-            var status = Utf8.FromUtf16(this.buffer.AsSpan(this.transcoded, this.written - this.transcoded),
-                buffer.AsSpan(bufferOffset, length), out var charsTranscoded, out bytesWritten);
-            MarkTranscoded(charsTranscoded);
+            var status = Utf8.FromUtf16(this.chars.AsSpan(this.charsTranscoded, this.charsWritten - this.charsTranscoded),
+                buffer.AsSpan(bufferOffset, length), out var charsTranscodedNow, out bytesWritten);
 
-            return status != OperationStatus.InvalidData;
-        }
-
-        private void MarkWritten(int more)
-        {
-            ObjectDisposedException.ThrowIf(this.buffer is null, this);
-            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(more);
-
-            var writtenMore = this.written + more;
-            ArgumentOutOfRangeException.ThrowIfGreaterThan(writtenMore, this.buffer.Length, nameof(more));
-            this.written = writtenMore;
-        }
-
-        private void MarkTranscoded(int more)
-        {
-            ObjectDisposedException.ThrowIf(this.buffer is null, this);
-            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(more);
-
-            var transcodedMore = this.transcoded + more;
-            ArgumentOutOfRangeException.ThrowIfGreaterThan(transcodedMore, this.written, nameof(more));
-            this.transcoded = transcodedMore;
-
-            if (this.transcoded == this.written)
+            if (status != OperationStatus.InvalidData)
             {
-                this.written = 0;
-                this.transcoded = 0;
+                this.charsTranscoded += charsTranscodedNow;
+                if (this.charsTranscoded == this.charsWritten)
+                {
+                    this.charsWritten = 0;
+                    this.charsTranscoded = 0;
+                }
+
+                return true;
             }
+
+            bytesWritten = 0;
+            return false;
         }
 
         private void Free()
         {
-            var array = this.buffer;
+            var array = this.chars;
             if (array is not null)
             {
                 ArrayPool<char>.Shared.Return(array);
-                this.buffer = null;
+                this.chars = null;
             }
         }
     }
