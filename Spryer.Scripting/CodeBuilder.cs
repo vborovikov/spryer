@@ -221,7 +221,7 @@ public class CodeBuilder
 
     private void DoTrim()
     {
-        while (_stringBuilder.Length > 0 && char.IsWhiteSpace(_stringBuilder[^1]))
+        while (_stringBuilder.Length > 0 && _stringBuilder[^1] is ' ' or '\t')
         {
             _stringBuilder.Length--;
         }
