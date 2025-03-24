@@ -180,6 +180,16 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
             /// {GetMethodResultDescription()}
             /// </returns>
             """);
+
+        if (!this.IsInline)
+        {
+            code.AppendLine("/// <remarks>")
+                .AppendLine("/// The SQL script used to generate this method:")
+                .AppendLine("/// <code>")
+                .AppendLines(this.Script.Text, prefix: $"/// {CodeBuilder.Tab}")
+                .AppendLine("/// </code>")
+                .AppendLine("/// </remarks>");
+        }
     }
 
     private string GetMethodDescription()

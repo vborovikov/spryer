@@ -39,6 +39,11 @@ public class CodeBuilder
         => _stringBuilder.Length;
 
     /// <summary>
+    ///     The default tab string.
+    /// </summary>
+    public static readonly string Tab = new(' ', IndentSize);
+
+    /// <summary>
     ///     Appends the current indent and then the given string to the string being built.
     /// </summary>
     /// <param name="value">The string to append.</param>
@@ -168,9 +173,11 @@ public class CodeBuilder
     ///     by the current indent and followed by a new line, to the string being built.
     /// </summary>
     /// <param name="value">The string to append.</param>
+    /// <param name="prefix">The prefix to append before each line.</param>
+    /// <param name="suffix">The suffix to append after each line.</param>
     /// <param name="skipFinalNewline">If <see langword="true" />, then the terminating new line is not added after the last line.</param>
     /// <returns>This builder so that additional calls can be chained.</returns>
-    public virtual CodeBuilder AppendLines(string value, bool skipFinalNewline = false)
+    public virtual CodeBuilder AppendLines(string value, string? prefix = null, string? suffix = null, bool skipFinalNewline = false)
     {
         using (var reader = new StringReader(value))
         {
@@ -187,10 +194,20 @@ public class CodeBuilder
                     AppendLine();
                 }
 
+                if (prefix is not null)
+                {
+                    Append(prefix);
+                }
                 if (line.Length != 0)
                 {
                     Append(line);
                 }
+                if (suffix is not null)
+                {
+                    Append(suffix);
+                }
+
+                DoTrim();
             }
         }
 
@@ -200,6 +217,14 @@ public class CodeBuilder
         }
 
         return this;
+    }
+
+    private void DoTrim()
+    {
+        while (_stringBuilder.Length > 0 && char.IsWhiteSpace(_stringBuilder[^1]))
+        {
+            _stringBuilder.Length--;
+        }
     }
 
     /// <summary>
