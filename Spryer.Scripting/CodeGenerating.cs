@@ -2,6 +2,7 @@
 
 using System;
 using System.Buffers;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -22,12 +23,17 @@ static class CodeGenerating
         return Normalize(input.ToCharArray(), VarTrimChars).ToString();
     }
 
-    public static string ToCamelCase(this string input)
+    public static string ToCamelCase(this string input, bool skipKeywordCheck = false)
     {
         if (string.IsNullOrEmpty(input))
             return string.Empty;
 
-        return Normalize(input.ToCharArray(), VarTrimChars, camelCase: true).ToString();
+        var normalized = Normalize(input.ToCharArray(), VarTrimChars, camelCase: true).ToString();
+        
+        if (!skipKeywordCheck && ReservedKeywords.Contains(normalized))
+            return $"@{normalized}";
+
+        return normalized;
     }
 
     private static ReadOnlySpan<char> Normalize(Span<char> span, SearchValues<char> trimChars, bool camelCase = false)
@@ -61,4 +67,20 @@ static class CodeGenerating
 
         return span[..pos];
     }
+
+    private static readonly HashSet<string> ReservedKeywords = new(StringComparer.Ordinal)
+    {
+        "abstract", "add", "alias", "allows", "and", "args", "as", "ascending", "async", "await", "base",
+        "bool", "break", "by", "byte", "case", "catch", "char", "checked", "class", "const", "continue",
+        "decimal", "default", "delegate", "descending", "do", "double", "dynamic", "else", "enum", "equals",
+        "event", "explicit", "extern", "false", "field", "file", "finally", "fixed", "float", "for", "foreach",
+        "from", "get", "global", "goto", "group", "if", "implicit", "in", "init", "int", "interface", "internal",
+        "into", "is", "join", "let", "lock", "long", "managed", "nameof", "namespace", "new", "nint", "not",
+        "notnull", "nuint", "null", "object", "on", "operator", "or", "orderby", "out", "override", "params",
+        "partial", "private", "protected", "public", "readonly", "record", "ref", "remove", "required", "return",
+        "sbyte", "scoped", "sealed", "select", "set", "short", "sizeof", "stackalloc", "static", "string",
+        "struct", "switch", "this", "throw", "true", "try", "typeof", "uint", "ulong", "unchecked", "unmanaged",
+        "unsafe", "ushort", "using", "value", "var", "virtual", "void", "volatile", "when", "where", "while",
+        "with", "yield",
+    };
 }

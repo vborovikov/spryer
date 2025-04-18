@@ -165,7 +165,7 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
 
         foreach (var p in this.Script.Parameters)
         {
-            code.AppendLine($"/// <param name=\"{p.Name.ToCamelCase()}\">The query parameter {p.Name} of type {p.Type}.</param>");
+            code.AppendLine($"/// <param name=\"{p.Name.ToCamelCase(skipKeywordCheck: true)}\">The query parameter {p.Name} of type {p.Type}.</param>");
         }
 
         if (!usesTransaction)
