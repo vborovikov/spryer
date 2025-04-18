@@ -56,19 +56,22 @@ public sealed class ScriptClass : ICodeGenerator
 
         using (code.Indent())
         {
+            var appendLine = false;
             if (!this.IsInline)
             {
                 GenerateCtor(code);
+                appendLine = true;
             }
 
             foreach (var script in this.scriptMap.Enumerate())
             {
-                code.AppendLine();
+                if (appendLine) code.AppendLine();
                 var scriptMethod = new ScriptMethod(script)
                 {
                     IsInline = this.IsInline,
                 };
                 scriptMethod.Generate(code);
+                appendLine = true;
             }
         }
 
