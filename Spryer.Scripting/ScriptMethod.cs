@@ -295,7 +295,7 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
             DbType.DateTimeOffset => "DateTimeOffset",
             DbType.Binary => "byte[]",
             DbType.Guid => "Guid?",
-            _ => string.IsNullOrWhiteSpace(p.CustomType) ? "object" : p.CustomType ?? "object?"
+            _ => string.IsNullOrWhiteSpace(p.CustomType) ? "object?" : p.CustomType
         };
     }
 

@@ -502,14 +502,15 @@ record DbScriptParameter(string Name, DbType Type)
 
             if (typeName.Length > 0)
             {
-                if (typeMap.TryGetValue(typeName.ToString(), out var foundType))
+                if (typeName[0] != '[' && typeName[^1] != ']' &&
+                    typeMap.TryGetValue(typeName.ToString(), out var foundType))
                 {
                     type = foundType;
                 }
                 else
                 {
                     type = DbType.Object;
-                    customType = typeName.ToString();
+                    customType = typeName.TrimStart('[').TrimEnd(']').Trim().ToString();
                 }
             }
         }

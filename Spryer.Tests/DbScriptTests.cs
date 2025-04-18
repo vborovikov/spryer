@@ -1,5 +1,6 @@
 ﻿namespace Spryer.Tests;
 
+using System.Data;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 [TestClass]
@@ -178,5 +179,28 @@ public class DbScriptTests
             --@
             """);
         Assert.IsFalse(pragma.Data.EndsWith("--@"));
+    }
+
+    [TestMethod]
+    public void DbScript_PragmaWithCustomTypeSynonym_Parsed()
+    {
+        var pragma = CreatePragma(
+            """
+            --@query SearchRecipes(@Price [Money], @Sum money)
+            select 1;
+            --@
+            """
+        );
+        var result = DbScript.TryParse(pragma, out var script);
+
+        Assert.IsTrue(result);
+        Assert.IsNotNull(script);
+        Assert.AreEqual(2, script.Parameters.Length);
+        
+        Assert.AreEqual(DbType.Object, script.Parameters[0].Type);
+        Assert.AreEqual("Money", script.Parameters[0].CustomType);
+
+        Assert.AreEqual(DbType.Currency, script.Parameters[1].Type);
+        Assert.IsNull(script.Parameters[1].CustomType);
     }
 }
