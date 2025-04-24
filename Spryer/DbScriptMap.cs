@@ -122,7 +122,7 @@ public sealed class DbScriptMap
         var entryAssembly = Assembly.GetEntryAssembly();
         if (entryAssembly != callingAssembly)
         {
-            loader.Assembly = Assembly.GetEntryAssembly();
+            loader.Assembly = entryAssembly;
             loader.TryLoadScripts();
         }
 
