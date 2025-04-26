@@ -78,7 +78,23 @@ public class GenerateDbScriptClasses : Task
         {
             try
             {
+                // get file paths
                 var scriptFilePath = scriptFileItem.GetMetadata("FullPath");
+
+                var generatedFileId = GetGeneratedFileId(scriptFileItem);
+                var generatedFilePath = Path.Combine(
+                    this.RootDirectory ?? scriptFileItem.GetMetadata("DefiningProjectDirectory") ?? Path.GetDirectoryName(scriptFilePath) ?? string.Empty,
+                    generatedFileId);
+
+                // check if code generation is required
+                if (File.Exists(generatedFilePath) &&
+                    DateTime.TryParse(scriptFileItem.GetMetadata("ModifiedTime"), out var scriptFileModified) &&
+                    scriptFileModified <= File.GetLastWriteTime(generatedFilePath))
+                {
+                    // the generated file is already up-to-date
+                    this.Log.LogMessage(MessageImportance.Normal, $"Skipping {generatedFilePath}");
+                    continue;
+                }
 
                 // load scripts
                 var scriptMapLoader = new DbScriptMap.Loader
@@ -99,12 +115,6 @@ public class GenerateDbScriptClasses : Task
                 scriptClass.Generate(code);
 
                 // save file
-                var generatedFileId = GetGeneratedFileId(scriptFileItem);
-
-                var generatedFilePath = Path.Combine(
-                    this.RootDirectory ?? scriptFileItem.GetMetadata("DefiningProjectDirectory") ?? Path.GetDirectoryName(scriptFilePath) ?? string.Empty,
-                    generatedFileId);
-
                 this.Log.LogMessage(MessageImportance.Normal, $"Generating {generatedFilePath}");
                 var directory = Path.GetDirectoryName(generatedFilePath);
                 if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
