@@ -30,14 +30,57 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
             code.AppendLine(methodXmlDocRef);
             GenerateTxCommitMethod(code, parameters);
 
-            //code.AppendLine();
-            //code.AppendLine(methodXmlDocRef);
-            //GenerateTxCommitCancelMethod(code, parameters);
+            code.AppendLine();
+            code.AppendLine(methodXmlDocRef);
+            GenerateTxCommitCancelMethod(code, parameters);
         }
     }
 
     private void GenerateTxCommitCancelMethod(CodeBuilder code, string parameters)
     {
+        // method signature
+        code.Append(
+            $"""
+            public static {GetDapperMethodReturnType()} {GetMethodName(commitsTransaction: true)}{GetDapperMethodGenericType()}(this DbConnection {Cnn}
+            """);
+        if (!string.IsNullOrWhiteSpace(parameters))
+        {
+            code.Append(',')
+                .AppendLine()
+                .IncrementIndent()
+                .Append(parameters)
+                .DecrementIndent();
+        }
+        // SqlMapper parameters
+        code.Append(',')
+            .AppendLine()
+            .IncrementIndent()
+            .Append("CancellationToken cancellationToken)")
+            .AppendLine()
+            .DecrementIndent();
+
+        // method body
+        code.Append('{').AppendLine();
+        using (code.Indent())
+        {
+            code.Append($"return {GetMethodName(commitsTransaction: true)}{GetDapperMethodGenericType()}({Cnn}");
+            if (this.Script.Parameters.Length > 0)
+            {
+                code.Append(',')
+                    .AppendLine()
+                    .IncrementIndent()
+                    .Append(string.Join(", ", this.Script.Parameters.Select(p => p.Name.ToCamelCase())))
+                    .DecrementIndent();
+            }
+
+            // SqlMapper arguments
+            code.AppendLine(",")
+                .IncrementIndent()
+                .AppendLine($"commandTimeout: null, commandType: null, cancellationToken: cancellationToken);")
+                .DecrementIndent();
+
+        }
+        code.Append('}').AppendLine();
     }
 
     private void GenerateTxCommitMethod(CodeBuilder code, string parameters)
