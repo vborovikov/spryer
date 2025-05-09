@@ -20,14 +20,24 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
 
         if (this.Script.Type is DbScriptType.Execute or DbScriptType.ExecuteReader or DbScriptType.ExecuteScalar)
         {
+            var methodXmlDocRef = $"/// <inheritdoc cref=\"{GetMethodName()}\"/>";
+
             code.AppendLine();
-            GenerateXmlDocs(code, extendsTransaction: true);
+            code.AppendLine(methodXmlDocRef);
             GenerateTxMethod(code, parameters);
 
             code.AppendLine();
-            GenerateXmlDocs(code, extendsTransaction: false, hasTransactionParam: false);
+            code.AppendLine(methodXmlDocRef);
             GenerateTxCommitMethod(code, parameters);
+
+            //code.AppendLine();
+            //code.AppendLine(methodXmlDocRef);
+            //GenerateTxCommitCancelMethod(code, parameters);
         }
+    }
+
+    private void GenerateTxCommitCancelMethod(CodeBuilder code, string parameters)
+    {
     }
 
     private void GenerateTxCommitMethod(CodeBuilder code, string parameters)
