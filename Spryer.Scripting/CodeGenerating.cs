@@ -33,6 +33,9 @@ static class CodeGenerating
         if (!skipKeywordCheck && ReservedKeywords.Contains(normalized))
             return $"@{normalized}";
 
+        if (ReservedNames.Contains(normalized))
+            return $"_{normalized}";
+
         return normalized;
     }
 
@@ -82,5 +85,10 @@ static class CodeGenerating
         "struct", "switch", "this", "throw", "true", "try", "typeof", "uint", "ulong", "unchecked", "unmanaged",
         "unsafe", "ushort", "using", "value", "var", "virtual", "void", "volatile", "when", "where", "while",
         "with", "yield",
+    };
+
+    private static readonly HashSet<string> ReservedNames = new(StringComparer.Ordinal)
+    {
+        "cancellationToken", "commandTimeout", "commandType", "connection", "exception", "returnValue", "transaction"
     };
 }

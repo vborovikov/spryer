@@ -21,16 +21,94 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
         if (this.Script.Type is DbScriptType.Execute or DbScriptType.ExecuteReader or DbScriptType.ExecuteScalar)
         {
             code.AppendLine();
-
-            GenerateXmlDocs(code, usesTransaction: true);
+            GenerateXmlDocs(code, extendsTransaction: true);
             GenerateTxMethod(code, parameters);
+
+            code.AppendLine();
+            GenerateXmlDocs(code, extendsTransaction: false, hasTransactionParam: false);
+            GenerateTxCommitMethod(code, parameters);
         }
+    }
+
+    private void GenerateTxCommitMethod(CodeBuilder code, string parameters)
+    {
+        // method signature
+        code.Append(
+            $"""
+            public static async {GetDapperMethodReturnType()} {GetMethodName(commitsTransaction: true)}{GetDapperMethodGenericType()}(this DbConnection {Cnn}
+            """);
+        if (!string.IsNullOrWhiteSpace(parameters))
+        {
+            code.Append(',')
+                .AppendLine()
+                .IncrementIndent()
+                .Append(parameters)
+                .DecrementIndent();
+        }
+        // SqlMapper parameters
+        code.Append(',')
+            .AppendLine()
+            .IncrementIndent()
+            .Append("int? commandTimeout = null, CommandType? commandType = null, CancellationToken cancellationToken = default)")
+            .AppendLine()
+            .DecrementIndent();
+
+        // method body
+        code.Append('{').AppendLine();
+        using (code.Indent())
+        {
+            code.AppendLines(
+                $$"""
+                await using var {{Tx}} = await {{Cnn}}.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+                try
+                {
+                """);
+
+            using (code.Indent())
+            {
+                code.Append($"var returnValue = await {Tx}.{GetMethodName()}{GetDapperMethodGenericType()}(");
+                if (this.Script.Parameters.Length > 0)
+                {
+                    code.AppendLine()
+                        .IncrementIndent()
+                        .Append(string.Join(", ", this.Script.Parameters.Select(p => p.Name.ToCamelCase())))
+                        .AppendLine(",")
+                        .DecrementIndent();
+                }
+
+                // SqlMapper arguments
+                code.IncrementIndent()
+                    .AppendLine($"commandTimeout: commandTimeout, commandType: commandType).ConfigureAwait(false);")
+                    .DecrementIndent();
+
+                code.AppendLines(
+                    $"""
+                    await {Tx}.CommitAsync(cancellationToken).ConfigureAwait(false);
+
+                    return returnValue;
+                    """);
+            }
+
+            code.AppendLines(
+                $$"""
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    await {{Tx}}.RollbackAsync(cancellationToken).ConfigureAwait(false);
+                    throw;
+                }
+                """);
+        }
+        code.Append('}').AppendLine();
     }
 
     private void GenerateTxMethod(CodeBuilder code, string parameters)
     {
         // method signature
-        code.Append($"public static {GetDapperMethodReturnType()} {GetMethodName()}{GetDapperMethodGenericType()}(this DbTransaction {Tx}");
+        code.Append(
+            $"""
+            public static {GetDapperMethodReturnType()} {GetMethodName()}{GetDapperMethodGenericType()}(this DbTransaction {Tx}
+            """);
         if (!string.IsNullOrWhiteSpace(parameters))
         {
             code.Append(',')
@@ -147,7 +225,7 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
         code.Append('}').AppendLine();
     }
 
-    private void GenerateXmlDocs(CodeBuilder code, bool usesTransaction = false)
+    private void GenerateXmlDocs(CodeBuilder code, bool extendsTransaction = false, bool hasTransactionParam = true)
     {
         code.AppendLines(
             $"""
@@ -155,14 +233,14 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
             /// {GetMethodDescription()}
             /// </summary>
             """);
-        
+
         if (this.Script.Type is not DbScriptType.Execute and not DbScriptType.ExecuteReader and
             not DbScriptType.QueryMultiple and not DbScriptType.QueryText)
         {
             code.AppendLine("/// <typeparam name=\"T\">The type of the result.</typeparam>");
         }
 
-        if (usesTransaction)
+        if (extendsTransaction)
         {
             code.AppendLine($"/// <param name=\"{Tx}\">The transaction to use for this query.</param>");
         }
@@ -176,7 +254,7 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
             code.AppendLine($"/// <param name=\"{p.Name.ToCamelCase(skipKeywordCheck: true)}\">The query parameter {p.Name} of type {p.Type}.</param>");
         }
 
-        if (!usesTransaction)
+        if (!extendsTransaction && hasTransactionParam)
         {
             code.AppendLine("/// <param name=\"transaction\">The transaction to use for this query.</param>");
         }
@@ -240,9 +318,12 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
         };
     }
 
-    private string GetMethodName()
+    private string GetMethodName(bool commitsTransaction = false)
     {
-        return $"{this.Script.Name.ToPascalCase()}Async";
+        return string.Concat(
+            commitsTransaction ? "Commit" : "",
+            this.Script.Name.ToPascalCase(),
+            "Async");
     }
 
     private string GetArguments()
