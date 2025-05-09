@@ -16,6 +16,7 @@ public sealed class ScriptClass : ICodeGenerator
         System.Collections.Generic;
         System.Data;
         System.Data.Common;
+        System.Threading;
         System.Threading.Tasks;
         Dapper;
         Spryer;
