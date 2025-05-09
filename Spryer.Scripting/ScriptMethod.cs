@@ -13,13 +13,68 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
 
     public void Generate(CodeBuilder code)
     {
-        var methodName = GetMethodName();
+        var parameters = GetParameters();
 
         GenerateXmlDocs(code);
+        GenerateCnnMethod(code, parameters);
 
+        if (this.Script.Type is DbScriptType.Execute or DbScriptType.ExecuteReader or DbScriptType.ExecuteScalar)
+        {
+            code.AppendLine();
+
+            GenerateXmlDocs(code, usesTransaction: true);
+            GenerateTxMethod(code, parameters);
+        }
+    }
+
+    private void GenerateTxMethod(CodeBuilder code, string parameters)
+    {
         // method signature
-        code.Append($"public static {GetDapperMethodReturnType()} {methodName}{GetDapperMethodGenericType()}(this DbConnection {Cnn}");
-        var parameters = GetParameters();
+        code.Append($"public static {GetDapperMethodReturnType()} {GetMethodName()}{GetDapperMethodGenericType()}(this DbTransaction {Tx}");
+        if (!string.IsNullOrWhiteSpace(parameters))
+        {
+            code.Append(',')
+                .AppendLine()
+                .IncrementIndent()
+                .Append(parameters)
+                .DecrementIndent();
+        }
+        // SqlMapper parameters
+        code.Append(',')
+            .AppendLine()
+            .IncrementIndent()
+            .Append("int? commandTimeout = null, CommandType? commandType = null)")
+            .AppendLine()
+            .DecrementIndent();
+
+        // method body
+        code.Append('{').AppendLine();
+        using (code.Indent())
+        {
+            code.Append($"return {GetMethodName()}{GetDapperMethodGenericType()}({Tx}.Connection!");
+            if (this.Script.Parameters.Length > 0)
+            {
+                code.Append(',')
+                    .AppendLine()
+                    .IncrementIndent()
+                    .Append(string.Join(", ", this.Script.Parameters.Select(p => p.Name.ToCamelCase())))
+                    .DecrementIndent();
+            }
+
+            // SqlMapper arguments
+            code.AppendLine(",")
+                .IncrementIndent()
+                .AppendLine($"transaction: {Tx}, commandTimeout: commandTimeout, commandType: commandType);")
+                .DecrementIndent();
+
+        }
+        code.Append('}').AppendLine();
+    }
+
+    private void GenerateCnnMethod(CodeBuilder code, string parameters)
+    {
+        // method signature
+        code.Append($"public static {GetDapperMethodReturnType()} {GetMethodName()}{GetDapperMethodGenericType()}(this DbConnection {Cnn}");
         if (!string.IsNullOrWhiteSpace(parameters))
         {
             code.Append(',')
@@ -90,53 +145,6 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
                 .DecrementIndent();
         }
         code.Append('}').AppendLine();
-
-        if (this.Script.Type is DbScriptType.Execute or DbScriptType.ExecuteReader or DbScriptType.ExecuteScalar)
-        {
-            code.AppendLine();
-            GenerateXmlDocs(code, usesTransaction: true);
-
-            // method signature
-            code.Append($"public static {GetDapperMethodReturnType()} {methodName}{GetDapperMethodGenericType()}(this DbTransaction {Tx}");
-            if (!string.IsNullOrWhiteSpace(parameters))
-            {
-                code.Append(',')
-                    .AppendLine()
-                    .IncrementIndent()
-                    .Append(parameters)
-                    .DecrementIndent();
-            }
-            // SqlMapper parameters
-            code.Append(',')
-                .AppendLine()
-                .IncrementIndent()
-                .Append("int? commandTimeout = null, CommandType? commandType = null)")
-                .AppendLine()
-                .DecrementIndent();
-
-            // method body
-            code.Append('{').AppendLine();
-            using (code.Indent())
-            {
-                code.Append($"return {methodName}{GetDapperMethodGenericType()}({Tx}.Connection!");
-                if (this.Script.Parameters.Length > 0)
-                {
-                    code.Append(',')
-                        .AppendLine()
-                        .IncrementIndent()
-                        .Append(string.Join(", ", this.Script.Parameters.Select(p => p.Name.ToCamelCase())))
-                        .DecrementIndent();
-                }
-
-                // SqlMapper arguments
-                code.AppendLine(",")
-                    .IncrementIndent()
-                    .AppendLine($"transaction: {Tx}, commandTimeout: commandTimeout, commandType: commandType);")
-                    .DecrementIndent();
-
-            }
-            code.Append('}').AppendLine();
-        }
     }
 
     private void GenerateXmlDocs(CodeBuilder code, bool usesTransaction = false)
