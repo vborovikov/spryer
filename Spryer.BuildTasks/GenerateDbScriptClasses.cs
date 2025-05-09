@@ -72,6 +72,7 @@ public class GenerateDbScriptClasses : Task
 
     private ITaskItem[] GenerateCode(ITaskItem[] scriptFileItems, IList<ITaskItem> generatedFiles, bool inlineScripts)
     {
+        var code = new CodeBuilder();
         var itemsWithLastGenOutput = new List<ITaskItem>();
 
         foreach (var scriptFileItem in scriptFileItems)
@@ -111,7 +112,7 @@ public class GenerateDbScriptClasses : Task
                     Namespace = scriptFileItem.GetMetadata("CustomToolNamespace") ?? this.RootNamespace,
                     IsInline = inlineScripts,
                 };
-                var code = new CodeBuilder();
+                code.Clear();
                 scriptClass.Generate(code);
 
                 // save file
