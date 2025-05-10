@@ -89,6 +89,6 @@ static class CodeGenerating
 
     private static readonly HashSet<string> ReservedNames = new(StringComparer.Ordinal)
     {
-        "cancellationToken", "commandTimeout", "commandType", "connection", "exception", "returnValue", "transaction"
+        "cancellationToken", "commandTimeout", "commandType", "connection", "database", "exception", "returnValue", "transaction"
     };
 }
