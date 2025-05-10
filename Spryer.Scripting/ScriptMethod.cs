@@ -22,11 +22,11 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
 
         code.AppendLine();
         code.AppendLine(methodXmlDocRef);
-        GenerateDbMethod(code, parameters);
+        GenerateDbMethod(code, parameters, commitVersion: false);
 
         code.AppendLine();
         code.AppendLine(methodXmlDocRef);
-        GenerateDbCancelMethod(code, parameters);
+        GenerateDbCancelMethod(code, parameters, commitVersion: false, dbAccessType: "DbDataSource", dbAccessName: Db);
 
         if (this.Script.Type is DbScriptType.Execute or DbScriptType.ExecuteReader or DbScriptType.ExecuteScalar)
         {
@@ -40,15 +40,15 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
 
             code.AppendLine();
             code.AppendLine(methodXmlDocRef);
-            GenerateTxCommitCancelMethod(code, parameters);
+            GenerateDbCancelMethod(code, parameters, commitVersion: true, dbAccessType: "DbConnection", dbAccessName: Cnn);
 
             code.AppendLine();
             code.AppendLine(methodXmlDocRef);
-            GenerateDbCommitMethod(code, parameters);
+            GenerateDbMethod(code, parameters, commitVersion: true);
 
             code.AppendLine();
             code.AppendLine(methodXmlDocRef);
-            GenerateDbCommitCancelMethod(code, parameters);
+            GenerateDbCancelMethod(code, parameters, commitVersion: true, dbAccessType: "DbDataSource", dbAccessName: Db);
         }
     }
 
@@ -127,12 +127,12 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
         code.AppendLine("}");
     }
 
-    private void GenerateDbMethod(CodeBuilder code, string parameters)
+    private void GenerateDbMethod(CodeBuilder code, string parameters, bool commitVersion)
     {
         // method signature
         code.AppendLine(
             $"""
-            public static async {GetDapperMethodReturnType()} {GetMethodName()}{GetDapperMethodGenericType()}(this DbDataSource {Db},
+            public static async {GetDapperMethodReturnType()} {GetMethodName(commitVersion)}{GetDapperMethodGenericType()}(this DbDataSource {Db},
             """);
         if (!string.IsNullOrWhiteSpace(parameters))
         {
@@ -150,12 +150,12 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
         code.AppendLine("{");
         using (code.Indent())
         {
-            code.AppendLine(
+            code.AppendLines(
                 $$"""
                 await using var {{Cnn}} = await {{Db}}.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+                return await {{Cnn}}.{{GetMethodName(commitVersion)}}{{GetDapperMethodGenericType()}}(
                 """);
 
-            code.AppendLine($"return await {Cnn}.{GetMethodName()}{GetDapperMethodGenericType()}(");
             if (this.Script.Parameters.Length > 0)
             {
                 code.IncrementIndent()
@@ -165,19 +165,26 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
             }
 
             // SqlMapper arguments
-            code.IncrementIndent()
-                .AppendLine($"commandTimeout: commandTimeout, commandType: commandType).ConfigureAwait(false);")
-                .DecrementIndent();
+            using (code.Indent())
+            {
+                code.Append("commandTimeout: commandTimeout, commandType: commandType");
+                if (commitVersion)
+                {
+                    code.Append(", cancellationToken: cancellationToken");
+                }
+                code.AppendLine(").ConfigureAwait(false);");
+            }
         }
         code.AppendLine("}");
     }
 
-    private void GenerateDbCancelMethod(CodeBuilder code, string parameters)
+    private void GenerateDbCancelMethod(CodeBuilder code, string parameters,
+        bool commitVersion, string dbAccessType, string dbAccessName)
     {
         // method signature
         code.AppendLine(
             $"""
-            public static {GetDapperMethodReturnType()} {GetMethodName()}{GetDapperMethodGenericType()}(this DbDataSource {Db},
+            public static {GetDapperMethodReturnType()} {GetMethodName(commitVersion)}{GetDapperMethodGenericType()}(this {dbAccessType} {dbAccessName},
             """);
         if (!string.IsNullOrWhiteSpace(parameters))
         {
@@ -195,7 +202,7 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
         code.AppendLine("{");
         using (code.Indent())
         {
-            code.AppendLine($"return {Db}.{GetMethodName()}{GetDapperMethodGenericType()}(");
+            code.AppendLine($"return {dbAccessName}.{GetMethodName(commitVersion)}{GetDapperMethodGenericType()}(");
             if (this.Script.Parameters.Length > 0)
             {
                 code.IncrementIndent()
@@ -316,131 +323,6 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
                     throw;
                 }
                 """);
-        }
-        code.AppendLine("}");
-    }
-
-    private void GenerateTxCommitCancelMethod(CodeBuilder code, string parameters)
-    {
-        // method signature
-        code.AppendLine(
-            $"""
-            public static {GetDapperMethodReturnType()} {GetMethodName(commitsTransaction: true)}{GetDapperMethodGenericType()}(this DbConnection {Cnn},
-            """);
-        if (!string.IsNullOrWhiteSpace(parameters))
-        {
-            code.IncrementIndent()
-                .Append(parameters)
-                .AppendLine(",")
-                .DecrementIndent();
-        }
-        // SqlMapper parameters
-        code.IncrementIndent()
-            .AppendLine("CancellationToken cancellationToken)")
-            .DecrementIndent();
-
-        // method body
-        code.AppendLine("{");
-        using (code.Indent())
-        {
-            code.AppendLine($"return {Cnn}.{GetMethodName(commitsTransaction: true)}{GetDapperMethodGenericType()}(");
-            if (this.Script.Parameters.Length > 0)
-            {
-                code.IncrementIndent()
-                    .AppendJoin(this.Script.Parameters.Select(p => p.Name.ToCamelCase()))
-                    .AppendLine(",")
-                    .DecrementIndent();
-            }
-
-            // SqlMapper arguments
-            code.IncrementIndent()
-                .AppendLine($"commandTimeout: null, commandType: null, cancellationToken: cancellationToken);")
-                .DecrementIndent();
-        }
-        code.AppendLine("}");
-    }
-
-    private void GenerateDbCommitMethod(CodeBuilder code, string parameters)
-    {
-        // method signature
-        code.AppendLine(
-            $"""
-            public static async {GetDapperMethodReturnType()} {GetMethodName(commitsTransaction: true)}{GetDapperMethodGenericType()}(this DbDataSource {Db},
-            """);
-        if (!string.IsNullOrWhiteSpace(parameters))
-        {
-            code.IncrementIndent()
-                .Append(parameters)
-                .AppendLine(",")
-                .DecrementIndent();
-        }
-        // SqlMapper parameters
-        code.IncrementIndent()
-            .AppendLine("int? commandTimeout = null, CommandType? commandType = null, CancellationToken cancellationToken = default)")
-            .DecrementIndent();
-
-        // method body
-        code.AppendLine("{");
-        using (code.Indent())
-        {
-            code.AppendLines(
-                $$"""
-                await using var {{Cnn}} = await {{Db}}.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-                return await {{Cnn}}.{{GetMethodName(commitsTransaction: true)}}{{GetDapperMethodGenericType()}}(
-                """);
-
-            if (this.Script.Parameters.Length > 0)
-            {
-                code.IncrementIndent()
-                    .AppendJoin(this.Script.Parameters.Select(p => p.Name.ToCamelCase()))
-                    .AppendLine(",")
-                    .DecrementIndent();
-            }
-
-            // SqlMapper arguments
-            code.IncrementIndent()
-                .AppendLine($"commandTimeout: commandTimeout, commandType: commandType, cancellationToken: cancellationToken).ConfigureAwait(false);")
-                .DecrementIndent();
-        }
-        code.AppendLine("}");
-    }
-
-    private void GenerateDbCommitCancelMethod(CodeBuilder code, string parameters)
-    {
-        // method signature
-        code.AppendLine(
-            $"""
-            public static {GetDapperMethodReturnType()} {GetMethodName(commitsTransaction: true)}{GetDapperMethodGenericType()}(this DbDataSource {Db},
-            """);
-        if (!string.IsNullOrWhiteSpace(parameters))
-        {
-            code.IncrementIndent()
-                .Append(parameters)
-                .AppendLine(",")
-                .DecrementIndent();
-        }
-        // SqlMapper parameters
-        code.IncrementIndent()
-            .AppendLine("CancellationToken cancellationToken)")
-            .DecrementIndent();
-
-        // method body
-        code.AppendLine("{");
-        using (code.Indent())
-        {
-            code.AppendLine($"return {Db}.{GetMethodName(commitsTransaction: true)}{GetDapperMethodGenericType()}(");
-            if (this.Script.Parameters.Length > 0)
-            {
-                code.IncrementIndent()
-                    .AppendJoin(this.Script.Parameters.Select(p => p.Name.ToCamelCase()))
-                    .AppendLine(",")
-                    .DecrementIndent();
-            }
-
-            // SqlMapper arguments
-            code.IncrementIndent()
-                .AppendLine($"commandTimeout: null, commandType: null, cancellationToken: cancellationToken);")
-                .DecrementIndent();
         }
         code.AppendLine("}");
     }
