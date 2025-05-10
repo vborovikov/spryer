@@ -391,19 +391,19 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
     {
         return this.Script.Type switch
         {
-            DbScriptType.Execute => "Executes a command and returns the number of rows affected.",
-            DbScriptType.ExecuteReader => "Executes a command and returns a <see cref=\"DbDataReader\" />.",
-            DbScriptType.ExecuteScalar => "Executes a command and returns the first column of the first row in the result set returned by the query.",
-            DbScriptType.Query => "Executes a query and returns the results as an <see cref=\"IEnumerable{T}\" />.",
-            DbScriptType.QueryFirst => "Executes a query and returns the first result.",
-            DbScriptType.QueryFirstOrDefault => "Executes a query and returns the first result, or the default value if no results are found.",
-            DbScriptType.QuerySingle => "Executes a query and returns a single result.",
-            DbScriptType.QuerySingleOrDefault => "Executes a query and returns a single result, or the default value if no results are found.",
-            DbScriptType.QueryMultiple => "Executes a query and returns a <see cref=\"SqlMapper.GridReader\" />.",
-            DbScriptType.QueryUnbuffered => "Executes a query and returns the results as an <see cref=\"IAsyncEnumerable{T}\" />.",
-            DbScriptType.QueryText => "Executes a query and returns the result as a string.",
-            DbScriptType.QueryJson => "Executes a query and returns the result as a JSON object.",
-            _ => "Executes a SQL command."
+            DbScriptType.Execute => $"Executes a command '{this.Script.Name}' and returns the number of rows affected.",
+            DbScriptType.ExecuteReader => $"Executes a command '{this.Script.Name}' and returns a <see cref=\"DbDataReader\" />.",
+            DbScriptType.ExecuteScalar => $"Executes a command '{this.Script.Name}' and returns the first column of the first row in the result set returned by the query.",
+            DbScriptType.Query => $"Executes a query '{this.Script.Name}' and returns the results as an <see cref=\"IEnumerable{{T}}\" />.",
+            DbScriptType.QueryFirst => $"Executes a query '{this.Script.Name}' and returns the first result.",
+            DbScriptType.QueryFirstOrDefault => $"Executes a query '{this.Script.Name}' and returns the first result, or the default value if no results are found.",
+            DbScriptType.QuerySingle => $"Executes a query '{this.Script.Name}' and returns a single result.",
+            DbScriptType.QuerySingleOrDefault => $"Executes a query '{this.Script.Name}' and returns a single result, or the default value if no results are found.",
+            DbScriptType.QueryMultiple => $"Executes a query '{this.Script.Name}' and returns a <see cref=\"SqlMapper.GridReader\" />.",
+            DbScriptType.QueryUnbuffered => $"Executes a query '{this.Script.Name}' and returns the results as an <see cref=\"IAsyncEnumerable{{T}}\" />.",
+            DbScriptType.QueryText => $"Executes a query '{this.Script.Name}' and returns the result as a string.",
+            DbScriptType.QueryJson => $"Executes a query '{this.Script.Name}' and returns the result as a JSON object.",
+            _ => $"Executes a SQL command '{this.Script.Name}'."
         };
     }
 
