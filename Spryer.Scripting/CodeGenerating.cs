@@ -29,7 +29,7 @@ static class CodeGenerating
             return string.Empty;
 
         var normalized = Normalize(input.ToCharArray(), VarTrimChars, camelCase: true).ToString();
-        
+
         if (!skipKeywordCheck && ReservedKeywords.Contains(normalized))
             return $"@{normalized}";
 
@@ -89,6 +89,7 @@ static class CodeGenerating
 
     private static readonly HashSet<string> ReservedNames = new(StringComparer.Ordinal)
     {
-        "cancellationToken", "commandTimeout", "commandType", "connection", "database", "exception", "returnValue", "transaction"
+        "cancellationToken", "commandTimeout", "commandType", "connection", "database",
+        "exception", "returnValue", "transaction"
     };
 }

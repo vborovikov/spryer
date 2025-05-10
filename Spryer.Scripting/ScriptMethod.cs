@@ -92,13 +92,14 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
                 code.Append($"sql[\"{this.Script.Name}\"]");
             }
 
-            if (this.Script.Parameters is [{ Name: "Parameters", Type: DbType.Object } dynamicParams])
+            if (this.Script.Parameters is [{ Type: DbType.Object } paramObject] &&
+                paramObject.Name.Equals("ParamObject", StringComparison.OrdinalIgnoreCase))
             {
-                // pass (@Parameters object) as is
+                // pass (@ParamObject object) as is
                 code.Append(',')
                     .AppendLine()
                     .IncrementIndent()
-                    .Append($"param: {dynamicParams.Name.ToCamelCase()}")
+                    .Append($"param: {paramObject.Name.ToCamelCase()}")
                     .DecrementIndent();
 
             }
