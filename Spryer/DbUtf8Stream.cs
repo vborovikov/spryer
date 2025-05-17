@@ -3,6 +3,7 @@
 using System;
 using System.Buffers;
 using System.Data.Common;
+using System.Diagnostics;
 using System.Text.Unicode;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,16 +13,22 @@ using System.Threading.Tasks;
 /// </summary>
 sealed class DbUtf8Stream : Stream
 {
-    private readonly DbUtf8Reader reader;
+    private const int TranscodingFactor = 3;
+
+    private readonly DbDataReader reader;
+    private readonly DataBuffer<char> chars;
+    private readonly DataBuffer<byte> bytes;
     private long dataOffset;
 
     public DbUtf8Stream(DbDataReader reader)
     {
-        this.reader = new(reader);
+        this.reader = reader;
+        this.chars = new();
+        this.bytes = new(TranscodingFactor);
         this.dataOffset = -1L;
     }
 
-    public override bool CanRead => !this.reader.IsClosed;
+    public override bool CanRead => true;
     public override bool CanSeek => false;
     public override bool CanWrite => false;
     public override long Length => throw new NotSupportedException();
@@ -31,6 +38,8 @@ sealed class DbUtf8Stream : Stream
     {
         if (disposing)
         {
+            this.bytes.Dispose();
+            this.chars.Dispose();
             this.reader.Dispose();
         }
         base.Dispose(disposing);
@@ -38,67 +47,148 @@ sealed class DbUtf8Stream : Stream
 
     public override async ValueTask DisposeAsync()
     {
+        await this.bytes.DisposeAsync();
+        await this.chars.DisposeAsync();
         await this.reader.DisposeAsync();
         await base.DisposeAsync();
     }
 
-    public override int Read(byte[] buffer, int offset, int count)
+    public override int Read(byte[] buffer, int offset, int count) =>
+        Read(buffer.AsSpan(offset, count));
+
+    public override int Read(Span<byte> buffer)
     {
-        var total = 0;
+        var doneReading = this.reader.IsClosed;
 
-        while (total < count)
+        // read more data
+        if (!doneReading)
         {
-            if (this.dataOffset < 0L)
+            while (this.chars.SpanLength > 0)
             {
-                if (!this.reader.Read())
+                if (this.dataOffset < 0L)
                 {
-                    break;
+                    if (!TryReadRow())
+                    {
+                        doneReading = true;
+                        break;
+                    }
+                    this.dataOffset = 0L;
                 }
-                this.dataOffset = 0L;
+
+                var charsRead = (int)this.reader.GetChars(0, this.dataOffset, this.chars, this.chars.SpanOffset, this.chars.SpanLength);
+                if (charsRead > 0)
+                {
+                    this.chars.MarkUsed(charsRead);
+                    this.dataOffset += charsRead;
+                }
+                else
+                {
+                    this.dataOffset = -1L;
+                }
             }
 
-            if (this.reader.TryGetBytes(0, this.dataOffset, out var charsRead, buffer, offset + total, count - total, out var bytesWritten))
+            if (doneReading)
             {
-                total += bytesWritten;
-                this.dataOffset += charsRead;
-            }
-            else
-            {
-                this.dataOffset = -1L;
+                this.reader.Close();
             }
         }
 
-        return total;
+        // transcode more data
+        if (this.chars.DataLength > 0 && this.bytes.SpanLength > 0)
+        {
+            var status = Utf8.FromUtf16(this.chars, this.bytes, out var charsTranscoded, out var bytesWritten, isFinalBlock: doneReading);
+            if (status != OperationStatus.InvalidData)
+            {
+                this.chars.MarkFree(charsTranscoded);
+                this.bytes.MarkUsed(bytesWritten);
+            }
+        }
+
+        // move requested length
+        return this.bytes.MoveTo(buffer);
     }
 
-    public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
-    {
-        var total = 0;
+    public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+        ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
 
-        while (total < count)
+    public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+    {
+        var doneReading = this.reader.IsClosed;
+
+        // read more data
+        if (!doneReading)
         {
-            if (this.dataOffset < 0L)
+            while (this.chars.SpanLength > 0)
             {
-                if (!await this.reader.ReadAsync(cancellationToken))
+                if (this.dataOffset < 0L)
                 {
-                    break;
+                    if (!await TryReadRowAsync(cancellationToken).ConfigureAwait(false))
+                    {
+                        doneReading = true;
+                        break;
+                    }
+                    this.dataOffset = 0L;
                 }
 
-                this.dataOffset = 0L;
+                var charsRead = (int)this.reader.GetChars(0, this.dataOffset, this.chars, this.chars.SpanOffset, this.chars.SpanLength);
+                if (charsRead > 0)
+                {
+                    this.chars.MarkUsed(charsRead);
+                    this.dataOffset += charsRead;
+                }
+                else
+                {
+                    this.dataOffset = -1L;
+                }
             }
 
-            if (this.reader.TryGetBytes(0, this.dataOffset, out var charsRead, buffer, offset + total, count - total, out var bytesWritten))
+            if (doneReading)
             {
-                total += bytesWritten;
-                this.dataOffset += charsRead;
-            }
-            else
-            {
-                this.dataOffset = -1L;
+                await this.reader.CloseAsync().ConfigureAwait(false);
             }
         }
 
-        return total;
+        // transcode more data
+        if (this.chars.DataLength > 0 && this.bytes.SpanLength > 0)
+        {
+            var status = Utf8.FromUtf16(this.chars, this.bytes, out var charsTranscoded, out var bytesWritten, isFinalBlock: doneReading);
+            if (status != OperationStatus.InvalidData)
+            {
+                this.chars.MarkFree(charsTranscoded);
+                this.bytes.MarkUsed(bytesWritten);
+            }
+        }
+
+        // move requested length
+        return this.bytes.MoveTo(buffer.Span);
+    }
+
+    private async Task<bool> TryReadRowAsync(CancellationToken cancellationToken)
+    {
+        do
+        {
+            if (await this.reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                return true;
+            }
+        } while (await this.reader.NextResultAsync(cancellationToken).ConfigureAwait(false));
+
+        // no more rows
+        return false;
+    }
+
+    private bool TryReadRow()
+    {
+        do
+        {
+            if (this.reader.Read())
+            {
+                return true;
+            }
+        } while (this.reader.NextResult());
+
+        // no more rows
+        return false;
     }
 
     public override void Flush() => throw new NotSupportedException();
@@ -106,89 +196,83 @@ sealed class DbUtf8Stream : Stream
     public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
     public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
 
-    /// <summary>
-    /// Decodes UTF-16 characters into UTF-8 bytes.
-    /// </summary>
-    class DbUtf8Reader : IDisposable, IAsyncDisposable
+    [DebuggerDisplay("Used: {SpanOffset} Read: {DataOffset}")]
+    sealed class DataBuffer<T> : IDisposable, IAsyncDisposable
+        where T : struct
     {
-        private const int TranscodingFactor = 3;
-        private const int DefaultBufferSize =1024 * 1024 * TranscodingFactor;
+        private const int DefaultSize = 16 * 1024;
 
-        private readonly DbDataReader reader;
-        private char[]? chars;
-        private int charsWritten;
-        private int charsConsumed;
+        private T[] array;
+        private int used;
+        private int free;
 
-        public DbUtf8Reader(DbDataReader reader)
+        public DataBuffer(int factor = 1)
         {
-            this.reader = reader;
-            this.chars = ArrayPool<char>.Shared.Rent(DefaultBufferSize);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(factor);
+            this.array = ArrayPool<T>.Shared.Rent(DefaultSize * factor);
         }
 
-        public bool IsClosed => this.reader.IsClosed;
+        public int SpanOffset => this.used;
+        public int SpanLength => this.array.Length - this.used;
+
+        public int DataOffset => this.free;
+        public int DataLength => this.used - this.free;
+
+        public static implicit operator T[](DataBuffer<T> buffer) => buffer.array;
+        public static implicit operator Span<T>(DataBuffer<T> buffer) =>
+            buffer.array.AsSpan(buffer.SpanOffset, buffer.SpanLength);
+        public static implicit operator ReadOnlySpan<T>(DataBuffer<T> buffer) =>
+            buffer.array.AsSpan(buffer.DataOffset, buffer.DataLength);
+
+        public void MarkUsed(int count)
+        {
+            this.used += count;
+        }
+
+        public void MarkFree(int count)
+        {
+            this.free += count;
+            if (this.free == this.used)
+            {
+                this.used = this.free = 0;
+            }
+        }
+
+        public int MoveTo(T[] buffer, int offset, int length) =>
+            MoveTo(buffer.AsSpan(offset, length));
+
+        public int MoveTo(Span<T> buffer)
+        {
+            var length = Math.Min(buffer.Length, this.DataLength);
+            if (length == 0) return 0;
+
+            if (this.array.AsSpan(this.DataOffset, length).TryCopyTo(buffer))
+            {
+                MarkFree(length);
+                return length;
+            }
+
+            return 0;
+        }
 
         public void Dispose()
         {
-            Free();
-            this.reader.Dispose();
+            Release();
         }
 
         public ValueTask DisposeAsync()
         {
-            Free();
-            return this.reader.DisposeAsync();
+            Release();
+            return ValueTask.CompletedTask;
         }
 
-        public bool Read() => this.reader.Read();
-
-        public Task<bool> ReadAsync(CancellationToken cancellationToken) => this.reader.ReadAsync(cancellationToken);
-
-        public bool TryGetBytes(int ordinal, long dataOffset, out int charsRead, byte[]? buffer, int bufferOffset, int length, out int bytesWritten)
+        private void Release()
         {
-            ObjectDisposedException.ThrowIf(this.chars is null, this);
-
-            charsRead = 0;
-            var charsLength = this.chars.Length - this.charsWritten;
-            if (this.charsConsumed == 0 && charsLength > 0)
+            var rented = this.array;
+            if (rented.Length > 0)
             {
-                charsRead = (int)this.reader.GetChars(ordinal, dataOffset, this.chars, this.charsWritten, charsLength);
-
-                this.charsWritten += charsRead;
-                if (this.charsWritten == 0)
-                {
-                    bytesWritten = 0;
-                    return false;
-                }
-            }
-
-            var status = Utf8.FromUtf16(this.chars.AsSpan(this.charsConsumed, this.charsWritten - this.charsConsumed),
-                buffer.AsSpan(bufferOffset, length), out var charsTranscoded, out bytesWritten,
-                isFinalBlock: charsLength > charsRead);
-
-            if (status != OperationStatus.InvalidData)
-            {
-                this.charsConsumed += charsTranscoded;
-
-                if (this.charsConsumed == this.charsWritten)
-                {
-                    this.charsWritten = 0;
-                    this.charsConsumed = 0;
-                }
-
-                return true;
-            }
-
-            bytesWritten = 0;
-            return false;
-        }
-
-        private void Free()
-        {
-            var array = this.chars;
-            if (array is not null)
-            {
-                ArrayPool<char>.Shared.Return(array);
-                this.chars = null;
+                ArrayPool<T>.Shared.Return(rented);
+                this.array = [];
             }
         }
     }
