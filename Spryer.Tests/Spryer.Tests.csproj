@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Samples\*.sql" />
+    <EmbeddedResource Include="Samples\*.json" />
   </ItemGroup>
 
   <ItemGroup>
