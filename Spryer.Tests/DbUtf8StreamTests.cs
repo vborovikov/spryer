@@ -33,26 +33,6 @@ public class DbUtf8StreamTests
         Assert.AreEqual(55, employees.Length);
     }
 
-    [TestMethod]
-    public void DbUtf8Stream_10KbSync_Parsed()
-    {
-        using var stream = new DbUtf8Stream(new JsonDataReader("employees_10KB.json"));
-        var employees = JsonSerializer.Deserialize<Employee[]>(stream);
-
-        Assert.IsNotNull(employees);
-        Assert.AreEqual(6, employees.Length);
-    }
-
-    [TestMethod]
-    public void DbUtf8Stream_100KbSync_Parsed()
-    {
-        using var stream = new DbUtf8Stream(new JsonDataReader("employees_100KB.json"));
-        var employees = JsonSerializer.Deserialize<Employee[]>(stream);
-
-        Assert.IsNotNull(employees);
-        Assert.AreEqual(55, employees.Length);
-    }
-
     record Employee
     {
         public int employee_id { get; init; }

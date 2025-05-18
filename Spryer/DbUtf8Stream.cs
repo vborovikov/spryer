@@ -13,14 +13,18 @@ using System.Threading.Tasks;
 /// </summary>
 sealed class DbUtf8Stream : Stream
 {
+    private const int TranscodingFactor = 3;
+
     private readonly DbDataReader reader;
     private readonly DataBuffer<char> chars;
+    private readonly DataBuffer<byte> bytes;
     private long dataOffset;
 
     public DbUtf8Stream(DbDataReader reader)
     {
         this.reader = reader;
         this.chars = new();
+        this.bytes = new(TranscodingFactor);
         this.dataOffset = -1L;
     }
 
@@ -34,6 +38,7 @@ sealed class DbUtf8Stream : Stream
     {
         if (disposing)
         {
+            this.bytes.Dispose();
             this.chars.Dispose();
             this.reader.Dispose();
         }
@@ -42,6 +47,7 @@ sealed class DbUtf8Stream : Stream
 
     public override async ValueTask DisposeAsync()
     {
+        await this.bytes.DisposeAsync();
         await this.chars.DisposeAsync();
         await this.reader.DisposeAsync();
         await base.DisposeAsync();
@@ -87,19 +93,19 @@ sealed class DbUtf8Stream : Stream
             }
         }
 
-        // transcode data
-        if (this.chars.DataLength > 0)
+        // transcode more data
+        if (this.chars.DataLength > 0 && this.bytes.SpanLength > 0)
         {
-            var status = Utf8.FromUtf16(this.chars, buffer, out var charsTranscoded, out var bytesWritten,
-                replaceInvalidSequences: false, isFinalBlock: doneReading);
+            var status = Utf8.FromUtf16(this.chars, this.bytes, out var charsTranscoded, out var bytesWritten, isFinalBlock: doneReading);
             if (status != OperationStatus.InvalidData)
             {
                 this.chars.MarkFree(charsTranscoded);
-                return bytesWritten;
+                this.bytes.MarkUsed(bytesWritten);
             }
         }
 
-        return 0;
+        // move requested length
+        return this.bytes.MoveTo(buffer);
     }
 
     public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
@@ -142,19 +148,19 @@ sealed class DbUtf8Stream : Stream
             }
         }
 
-        // transcode data
-        if (this.chars.DataLength > 0)
+        // transcode more data
+        if (this.chars.DataLength > 0 && this.bytes.SpanLength > 0)
         {
-            var status = Utf8.FromUtf16(this.chars, buffer.Span, out var charsTranscoded, out var bytesWritten,
-                replaceInvalidSequences: false, isFinalBlock: doneReading);
+            var status = Utf8.FromUtf16(this.chars, this.bytes, out var charsTranscoded, out var bytesWritten, isFinalBlock: doneReading);
             if (status != OperationStatus.InvalidData)
             {
                 this.chars.MarkFree(charsTranscoded);
-                return bytesWritten;
+                this.bytes.MarkUsed(bytesWritten);
             }
         }
 
-        return 0;
+        // move requested length
+        return this.bytes.MoveTo(buffer.Span);
     }
 
     private async Task<bool> TryReadRowAsync(CancellationToken cancellationToken)
@@ -194,7 +200,7 @@ sealed class DbUtf8Stream : Stream
     sealed class DataBuffer<T> : IDisposable, IAsyncDisposable
         where T : struct
     {
-        private const int DefaultSize = 64 * 1024;
+        private const int DefaultSize = 16 * 1024;
 
         private T[] array;
         private int used;
