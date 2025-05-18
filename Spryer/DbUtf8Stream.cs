@@ -93,19 +93,7 @@ sealed class DbUtf8Stream : Stream
             }
         }
 
-        // transcode more data
-        if (this.chars.DataLength > 0 && this.bytes.SpanLength > 0)
-        {
-            var status = Utf8.FromUtf16(this.chars, this.bytes, out var charsTranscoded, out var bytesWritten, isFinalBlock: doneReading);
-            if (status != OperationStatus.InvalidData)
-            {
-                this.chars.MarkFree(charsTranscoded);
-                this.bytes.MarkUsed(bytesWritten);
-            }
-        }
-
-        // move requested length
-        return this.bytes.MoveTo(buffer);
+        return Transcode(buffer, doneReading);
     }
 
     public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
@@ -148,10 +136,20 @@ sealed class DbUtf8Stream : Stream
             }
         }
 
+        return Transcode(buffer.Span, doneReading);
+    }
+
+    private int Transcode(Span<byte> buffer, bool isFinalBlock)
+    {
+        // we use our byte buffer here because System.Text.Json
+        // can provide a 1-byte buffer sometimes making it impossible
+        // to progress the transcoding further
+
         // transcode more data
         if (this.chars.DataLength > 0 && this.bytes.SpanLength > 0)
         {
-            var status = Utf8.FromUtf16(this.chars, this.bytes, out var charsTranscoded, out var bytesWritten, isFinalBlock: doneReading);
+            var status = Utf8.FromUtf16(this.chars, this.bytes, out var charsTranscoded, out var bytesWritten,
+                replaceInvalidSequences: false, isFinalBlock: isFinalBlock);
             if (status != OperationStatus.InvalidData)
             {
                 this.chars.MarkFree(charsTranscoded);
@@ -160,7 +158,7 @@ sealed class DbUtf8Stream : Stream
         }
 
         // move requested length
-        return this.bytes.MoveTo(buffer.Span);
+        return this.bytes.MoveTo(buffer);
     }
 
     private async Task<bool> TryReadRowAsync(CancellationToken cancellationToken)
