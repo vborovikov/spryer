@@ -566,6 +566,13 @@ record DbScriptParameter(string Name, DbType Type)
          }).ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 }
 
+record DbScriptReturnType(DbType Type)
+{
+    public static readonly DbScriptReturnType Unspecified = new(DbType.Object);
+
+    public string? CustomType { get; init; }
+}
+
 /// <summary>
 /// Represents a kind of Dapper extension method to use with the script.
 /// </summary>
@@ -631,6 +638,7 @@ record DbScript(string Name, string Text)
 
     public DbScriptType Type { get; init; } = DbScriptType.Generic;
     public DbScriptParameter[] Parameters { get; init; } = [];
+    public DbScriptReturnType ReturnType { get; init; } = DbScriptReturnType.Unspecified;
 
     internal static bool TryParse(in Pragma pragma, [NotNullWhen(true)] out DbScript? script)
     {
@@ -686,6 +694,7 @@ record DbScript(string Name, string Text)
         Unknown,
         ScriptName,
         Parameter,
+        ReturnType,
     }
 
     [DebuggerDisplay("{Type}: {Span}")]

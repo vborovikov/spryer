@@ -203,4 +203,20 @@ public class DbScriptTests
         Assert.AreEqual(DbType.Currency, script.Parameters[1].Type);
         Assert.IsNull(script.Parameters[1].CustomType);
     }
+
+    [TestMethod]
+    public void DbScript_HasReturnType_Parsed()
+    {
+        var pragma = CreatePragma(
+            """
+            --@query Select(@Id int) : [CustomType]
+            select 1;
+            """);
+
+        var result = DbScript.TryParse(pragma, out var script);
+        Assert.IsTrue(result);
+        Assert.IsNotNull(script);
+
+        Assert.AreEqual("CustomType", script.ReturnType.CustomType);
+    }
 }
