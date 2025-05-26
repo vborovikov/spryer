@@ -462,74 +462,13 @@ public sealed class DbScriptMap
     }
 }
 
-[DebuggerDisplay("@{Name,nq} {Type}({Size})")]
-record DbScriptParameter(string Name, DbType Type)
+abstract record DbScriptDataType(DbType Type)
 {
     public int Size { get; init; }
 
     public string? CustomType { get; init; }
 
-    internal static bool TryParse(ReadOnlySpan<char> span, [NotNullWhen(true)] out DbScriptParameter? parameter)
-    {
-        var name = span;
-        var type = DbType.String;
-        var customType = default(string);
-        var size = -1;
-
-        var mid = span.IndexOf(' ');
-        if (mid > 0)
-        {
-            name = span[..mid];
-            var typeName = span[mid..].TrimStart();
-
-            var sep = typeName.IndexOf('(');
-            if (sep > 0)
-            {
-                var typeSize = typeName[(sep + 1)..].Trim().TrimEnd(')').Trim();
-                if (
-#if NET6_0_OR_GREATER
-                    int.TryParse(typeSize, out var parsedSize)
-#else
-                    int.TryParse(typeSize.ToString(), out var parsedSize)
-#endif
-                    )
-                {
-                    size = parsedSize;
-                }
-
-                typeName = typeName[..sep].TrimEnd();
-            }
-
-            if (typeName.Length > 0)
-            {
-                if (typeName[0] != '[' && typeName[^1] != ']' &&
-                    typeMap.TryGetValue(typeName.ToString(), out var foundType))
-                {
-                    type = foundType;
-                }
-                else
-                {
-                    type = DbType.Object;
-                    customType = typeName.TrimStart('[').TrimEnd(']').Trim().ToString();
-                }
-            }
-        }
-
-        if (name.Length > 1)
-        {
-            parameter = new(name.TrimStart('@').ToString(), type)
-            {
-                Size = size,
-                CustomType = customType,
-            };
-            return true;
-        }
-
-        parameter = null;
-        return false;
-    }
-
-    private static readonly FrozenDictionary<string, DbType> typeMap =
+    protected static readonly FrozenDictionary<string, DbType> DbTypeMap =
         (new KeyValuePair<string, DbType>[]
         {
             new("bigint", DbType.Int64),
@@ -566,11 +505,130 @@ record DbScriptParameter(string Name, DbType Type)
          }).ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 }
 
-record DbScriptReturnType(DbType Type)
+[DebuggerDisplay("@{Name,nq} {Type}({Size})")]
+record DbScriptParameter(string Name, DbType Type) : DbScriptDataType(Type)
 {
-    public static readonly DbScriptReturnType Unspecified = new(DbType.Object);
+    internal static bool TryParse(ReadOnlySpan<char> span, [NotNullWhen(true)] out DbScriptParameter? parameter)
+    {
+        var name = span;
+        var type = DbType.String;
+        var customType = default(string);
+        var size = -1;
 
-    public string? CustomType { get; init; }
+        var mid = span.IndexOf(' ');
+        if (mid > 0)
+        {
+            name = span[..mid];
+            var typeName = span[mid..].TrimStart();
+
+            var sep = typeName.IndexOfUnclosed('(', '[', ']');
+            if (sep > 0)
+            {
+                var typeSize = typeName[(sep + 1)..].Trim().TrimEnd(')').Trim();
+                if (
+#if NET6_0_OR_GREATER
+                    int.TryParse(typeSize, out var parsedSize)
+#else
+                    int.TryParse(typeSize.ToString(), out var parsedSize)
+#endif
+                    )
+                {
+                    size = parsedSize;
+                }
+
+                typeName = typeName[..sep].TrimEnd();
+            }
+
+            if (typeName.Length > 0)
+            {
+                if (typeName[0] != '[' && typeName[^1] != ']' &&
+                    DbTypeMap.TryGetValue(typeName.ToString(), out var foundType))
+                {
+                    type = foundType;
+                }
+                else
+                {
+                    type = DbType.Object;
+                    customType = typeName.TrimStart('[').TrimEnd(']').Trim().ToString();
+                }
+            }
+        }
+
+        if (name.Length > 1)
+        {
+            parameter = new(name.TrimStart('@').ToString(), type)
+            {
+                Size = size,
+                CustomType = customType,
+            };
+            return true;
+        }
+
+        parameter = null;
+        return false;
+    }
+}
+
+record DbScriptReturnType(DbType Type) : DbScriptDataType(Type)
+{
+    public static readonly DbScriptReturnType Implicit = new(DbType.Object);
+
+    public static bool TryParse(ReadOnlySpan<char> span, [NotNullWhen(true)] out DbScriptReturnType? returnType)
+    {
+        if (span.Length > 0)
+        {
+            var type = DbType.Object;
+            var customType = default(string);
+            var size = -1;
+
+            var typeName = span;
+
+            var sep = typeName.IndexOfUnclosed('(', '[', ']');
+            if (sep > 0)
+            {
+                var typeSize = typeName[(sep + 1)..].Trim().TrimEnd(')').Trim();
+                if (
+#if NET6_0_OR_GREATER
+                    int.TryParse(typeSize, out var parsedSize)
+#else
+                    int.TryParse(typeSize.ToString(), out var parsedSize)
+#endif
+                    )
+                {
+                    size = parsedSize;
+                }
+
+                typeName = typeName[..sep].TrimEnd();
+            }
+
+            if (typeName.Length > 0)
+            {
+                if (typeName[0] != '[' && typeName[^1] != ']' &&
+                    DbTypeMap.TryGetValue(typeName.ToString(), out var foundType))
+                {
+                    type = foundType;
+                }
+                else
+                {
+                    type = DbType.Object;
+                    customType = typeName.TrimStart('[').TrimEnd(']').Trim().ToString();
+                }
+            }
+
+            if (type != DbType.Object || !string.IsNullOrWhiteSpace(customType))
+            {
+                returnType = new(type)
+                {
+                    Size = size,
+                    CustomType = customType,
+                };
+                return true;
+            }
+        }
+
+        returnType = default;
+        return false;
+    }
 }
 
 /// <summary>
@@ -638,7 +696,7 @@ record DbScript(string Name, string Text)
 
     public DbScriptType Type { get; init; } = DbScriptType.Generic;
     public DbScriptParameter[] Parameters { get; init; } = [];
-    public DbScriptReturnType ReturnType { get; init; } = DbScriptReturnType.Unspecified;
+    public DbScriptReturnType ReturnType { get; init; } = DbScriptReturnType.Implicit;
 
     internal static bool TryParse(in Pragma pragma, [NotNullWhen(true)] out DbScript? script)
     {
@@ -650,6 +708,7 @@ record DbScript(string Name, string Text)
 
         var scriptName = string.Empty;
         var parameters = new List<DbScriptParameter>();
+        var returnType = DbScriptReturnType.Implicit;
         foreach (var token in MetaToken.Enumerate(pragma.Meta))
         {
             if (token.Type == MetaTokenType.Parameter && DbScriptParameter.TryParse(token.Span, out var parameter))
@@ -659,6 +718,10 @@ record DbScript(string Name, string Text)
             else if (token.Type == MetaTokenType.ScriptName)
             {
                 scriptName = token.Span.ToString();
+            }
+            else if (token.Type == MetaTokenType.ReturnType && DbScriptReturnType.TryParse(token.Span, out var parsedReturnType))
+            {
+                returnType = parsedReturnType;
             }
         }
 
@@ -671,7 +734,8 @@ record DbScript(string Name, string Text)
         script = new(scriptName, pragma.Data.ToString())
         {
             Type = DetectScriptType(pragma),
-            Parameters = parameters.ToArray()
+            Parameters = parameters.ToArray(),
+            ReturnType = returnType,
         };
         return true;
     }
@@ -737,7 +801,7 @@ record DbScript(string Name, string Text)
             if (remaining.IsEmpty)
                 return false;
 
-            if (this.type < MetaTokenType.Parameter)
+            if (this.type != MetaTokenType.Parameter)
             {
                 ++this.type;
             }
@@ -759,7 +823,8 @@ record DbScript(string Name, string Text)
                 this.current = new(span, this.type);
                 return true;
             }
-            else if (this.type == MetaTokenType.Parameter)
+
+            if (this.type == MetaTokenType.Parameter)
             {
                 if (remaining[0] == '(')
                     remaining = remaining[1..];
@@ -772,6 +837,25 @@ record DbScript(string Name, string Text)
                     this.current = new(span, this.type);
                     this.meta = remaining[end..].TrimStart(',');
                     return true;
+                }
+                else
+                {
+                    ++this.type;
+                }
+            }
+
+            if (this.type == MetaTokenType.ReturnType)
+            {
+                var start = remaining.IndexOf(':');
+                if (start >= 0 && start < (remaining.Length - 1))
+                {
+                    var span = remaining[(start + 1)..].Trim();
+                    if (span.Length > 0)
+                    {
+                        this.current = new(span, this.type);
+                        this.meta = default;
+                        return true;
+                    }
                 }
             }
 
