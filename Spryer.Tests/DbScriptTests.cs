@@ -209,7 +209,7 @@ public class DbScriptTests
     {
         var pragma = CreatePragma(
             """
-            --@query Select(@Id int) : [CustomType]
+            --@query Select(@Id int): [CustomType]
             select 1;
             """);
 
@@ -217,6 +217,27 @@ public class DbScriptTests
         Assert.IsTrue(result);
         Assert.IsNotNull(script);
 
+        Assert.IsTrue(script.HasReturnType);
         Assert.AreEqual("CustomType", script.ReturnType.CustomType);
+    }
+
+    [TestMethod]
+    public void DbScript_NoParamsHasReturnType_Parsed()
+    {
+        var pragma = CreatePragma(
+            """
+            --@query-first-default GetScheduledCommand: [PersistentCommand]
+            select top 1 s.*
+            from dbo.Schedule s
+            order by s.DueTime; 
+            """);
+
+        var result = DbScript.TryParse(pragma, out var script);
+        Assert.IsTrue(result);
+        Assert.IsNotNull(script);
+
+        Assert.AreEqual("GetScheduledCommand", script.Name);
+        Assert.IsTrue(script.HasReturnType);
+        Assert.AreEqual("PersistentCommand", script.ReturnType.CustomType);
     }
 }

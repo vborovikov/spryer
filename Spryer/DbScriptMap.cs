@@ -779,7 +779,7 @@ record DbScript(string Name, string Text)
 
     private ref struct MetaTokenEnumerator
     {
-        private static readonly SearchValues<char> NameSeparators = SearchValues.Create(" (");
+        private static readonly SearchValues<char> NameSeparators = SearchValues.Create(" (:");
         private static readonly SearchValues<char> ParamSeparators = SearchValues.Create(",)");
 
         private ReadOnlySpan<char> meta;
