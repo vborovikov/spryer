@@ -463,9 +463,14 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
         return paramName;
     }
 
-    private static string GetParamType(DbScriptParameter p)
+    private static string GetParamType(DbScriptParameter p) => GetCsType(p, nullable: null);
+
+    private static string GetReturnType(DbScriptReturnType rt, bool nullable) =>
+        rt == DbScriptReturnType.Implicit ? nullable ? "T?" : "T" : GetCsType(rt, nullable);
+
+    private static string GetCsType(DbScriptDataType p, bool? nullable)
     {
-        return p.Type switch
+        var csType = p.Type switch
         {
             DbType.Boolean => "bool",
             DbType.Byte => "byte",
@@ -485,16 +490,25 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
             DbType.StringFixedLength or
             DbType.AnsiStringFixedLength or
             DbType.VarNumeric or
-            DbType.Xml => "string?",
+            DbType.Xml => nullable is null ? "string?" : "string",
             DbType.DateTime or
             DbType.DateTime2 or
             DbType.Date or
             DbType.Time => "DateTime",
             DbType.DateTimeOffset => "DateTimeOffset",
             DbType.Binary => "byte[]",
-            DbType.Guid => "Guid?",
-            _ => string.IsNullOrWhiteSpace(p.CustomType) ? "object?" : p.CustomType
+            DbType.Guid => nullable is null ? "Guid?" : "Guid",
+            _ => string.IsNullOrWhiteSpace(p.CustomType) ?
+                nullable is null ? "object?" : "object" :
+                p.CustomType
         };
+
+        if (nullable == true && csType[^1] != '?')
+        {
+            csType += '?';
+        }
+
+        return csType;
     }
 
     private string GetDapperMethod()
@@ -514,7 +528,7 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
             DbScriptType.QueryText => "QueryTextAsync",
             DbScriptType.QueryJson => "QueryJsonAsync",
             _ => "ExecuteAsync"
-        } + GetDapperMethodGenericType();
+        } + GetDapperMethodGenericType(asTypeParam: false);
     }
 
     private string GetDapperMethodReturnType()
@@ -523,36 +537,41 @@ sealed record ScriptMethod(DbScript Script) : ICodeGenerator
         {
             DbScriptType.Execute => "Task<int>",
             DbScriptType.ExecuteReader => "Task<DbDataReader>",
-            DbScriptType.ExecuteScalar => "Task<T?>",
-            DbScriptType.Query => "Task<IEnumerable<T>>",
-            DbScriptType.QueryFirst => "Task<T>",
-            DbScriptType.QueryFirstOrDefault => "Task<T?>",
-            DbScriptType.QuerySingle => "Task<T>",
-            DbScriptType.QuerySingleOrDefault => "Task<T?>",
+            DbScriptType.ExecuteScalar => $"Task<{GetReturnType(this.Script.ReturnType, nullable: true)}>",
+            DbScriptType.Query => $"Task<IEnumerable<{GetReturnType(this.Script.ReturnType, nullable: false)}>>",
+            DbScriptType.QueryFirst => $"Task<{GetReturnType(this.Script.ReturnType, nullable: false)}>",
+            DbScriptType.QueryFirstOrDefault => $"Task<{GetReturnType(this.Script.ReturnType, nullable: true)}>",
+            DbScriptType.QuerySingle => $"Task<{GetReturnType(this.Script.ReturnType, nullable: false)}>",
+            DbScriptType.QuerySingleOrDefault => $"Task<{GetReturnType(this.Script.ReturnType, nullable: true)}>",
             DbScriptType.QueryMultiple => "Task<SqlMapper.GridReader>",
-            DbScriptType.QueryUnbuffered => "IAsyncEnumerable<T>",
+            DbScriptType.QueryUnbuffered => $"IAsyncEnumerable<{GetReturnType(this.Script.ReturnType, nullable: false)}>",
             DbScriptType.QueryText => "Task<string>",
-            DbScriptType.QueryJson => "Task<T?>",
+            DbScriptType.QueryJson => $"Task<{GetReturnType(this.Script.ReturnType, nullable: true)}>",
             _ => "Task<int>"
         };
     }
 
-    private string GetDapperMethodGenericType()
+    private string GetDapperMethodGenericType(bool asTypeParam = true)
     {
+        if (asTypeParam && this.Script.HasReturnType)
+        {
+            return string.Empty;
+        }
+
         return this.Script.Type switch
         {
             DbScriptType.Execute => string.Empty,
             DbScriptType.ExecuteReader => string.Empty,
-            DbScriptType.ExecuteScalar => "<T>",
-            DbScriptType.Query => "<T>",
-            DbScriptType.QueryFirst => "<T>",
-            DbScriptType.QueryFirstOrDefault => "<T>",
-            DbScriptType.QuerySingle => "<T>",
-            DbScriptType.QuerySingleOrDefault => "<T>",
+            DbScriptType.ExecuteScalar => $"<{GetReturnType(this.Script.ReturnType, nullable: false)}>",
+            DbScriptType.Query => $"<{GetReturnType(this.Script.ReturnType, nullable: false)}>",
+            DbScriptType.QueryFirst => $"<{GetReturnType(this.Script.ReturnType, nullable: false)}>",
+            DbScriptType.QueryFirstOrDefault => $"<{GetReturnType(this.Script.ReturnType, nullable: false)}>",
+            DbScriptType.QuerySingle => $"<{GetReturnType(this.Script.ReturnType, nullable: false)}>",
+            DbScriptType.QuerySingleOrDefault => $"<{GetReturnType(this.Script.ReturnType, nullable: false)}>",
             DbScriptType.QueryMultiple => string.Empty,
-            DbScriptType.QueryUnbuffered => "<T>",
+            DbScriptType.QueryUnbuffered => $"<{GetReturnType(this.Script.ReturnType, nullable: false)}>",
             DbScriptType.QueryText => string.Empty,
-            DbScriptType.QueryJson => "<T>",
+            DbScriptType.QueryJson => $"<{GetReturnType(this.Script.ReturnType, nullable: false)}>",
             _ => string.Empty
         };
     }

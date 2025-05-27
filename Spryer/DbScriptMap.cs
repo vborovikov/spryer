@@ -697,6 +697,7 @@ record DbScript(string Name, string Text)
     public DbScriptType Type { get; init; } = DbScriptType.Generic;
     public DbScriptParameter[] Parameters { get; init; } = [];
     public DbScriptReturnType ReturnType { get; init; } = DbScriptReturnType.Implicit;
+    public bool HasReturnType => this.ReturnType != DbScriptReturnType.Implicit;
 
     internal static bool TryParse(in Pragma pragma, [NotNullWhen(true)] out DbScript? script)
     {
